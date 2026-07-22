@@ -98,36 +98,110 @@ function startProcedural(onTx) {
   return () => clearInterval(id);
 }
 
+const FAUCET_URL = 'https://faucet.solana.com/';
+
+function faucetLink(pubkey) {
+  return pubkey
+    ? `${FAUCET_URL}?walletAddress=${encodeURIComponent(pubkey)}&amount=1&network=devnet`
+    : FAUCET_URL;
+}
+
+/**
+ * Devnet memo write. Never throws for expected failures — returns a status.
+ * status: 'ok' | 'simulated' | 'unfunded' | 'error'
+ */
 export async function recordContainment({ caseId, subject }) {
   const payload = {
     p: 'dark-forest-343', case: caseId, subject, ranger: 343, t: Date.now(),
   };
 
   if (!payer) {
-    await new Promise((r) => setTimeout(r, 900));
+    await new Promise((r) => setTimeout(r, 600));
     return {
+      status: 'simulated',
       simulated: true,
-      signature: 'SIMULATED — no funded devnet keypair configured',
+      unfunded: false,
+      pubkey: null,
+      faucetUrl: null,
+      signature: 'SIMULATED — no VITE_SOLANA_SECRET at build time',
       url: null,
       payload,
     };
   }
 
+  const pubkey = payer.publicKey.toBase58();
   const conn = new Connection(DEVNET, 'confirmed');
-  const tx = new Transaction().add(new TransactionInstruction({
-    keys: [],
-    programId: MEMO_PROGRAM,
-    data: new TextEncoder().encode(JSON.stringify(payload)),
-  }));
 
-  const signature = await conn.sendTransaction(tx, [payer]);
-  const res = await conn.confirmTransaction(signature, 'confirmed');
-  if (res?.value?.err) throw new Error('transaction confirmed with error');
+  try {
+    const bal = await conn.getBalance(payer.publicKey);
+    if (bal < 5000) {
+      return {
+        status: 'unfunded',
+        simulated: false,
+        unfunded: true,
+        pubkey,
+        faucetUrl: faucetLink(pubkey),
+        signature: 'NEEDS AIRDROP — 0 SOL on this pubkey',
+        url: null,
+        payload,
+      };
+    }
 
-  return {
-    simulated: false,
-    signature,
-    url: `https://explorer.solana.com/tx/${signature}?cluster=devnet`,
-    payload,
-  };
+    const tx = new Transaction().add(new TransactionInstruction({
+      keys: [],
+      programId: MEMO_PROGRAM,
+      data: new TextEncoder().encode(JSON.stringify(payload)),
+    }));
+
+    const signature = await conn.sendTransaction(tx, [payer]);
+    const res = await conn.confirmTransaction(signature, 'confirmed');
+    if (res?.value?.err) {
+      return {
+        status: 'error',
+        simulated: false,
+        unfunded: false,
+        pubkey,
+        faucetUrl: null,
+        signature: 'FAILED — confirmed with on-chain error',
+        url: `https://explorer.solana.com/tx/${signature}?cluster=devnet`,
+        payload,
+      };
+    }
+
+    return {
+      status: 'ok',
+      simulated: false,
+      unfunded: false,
+      pubkey,
+      faucetUrl: null,
+      signature,
+      url: `https://explorer.solana.com/tx/${signature}?cluster=devnet`,
+      payload,
+    };
+  } catch (e) {
+    const msg = String(e?.message || e);
+    const unfunded = /simulation failed|insufficient|no record of a prior credit|Attempt to debit/i.test(msg);
+    if (unfunded) {
+      return {
+        status: 'unfunded',
+        simulated: false,
+        unfunded: true,
+        pubkey,
+        faucetUrl: faucetLink(pubkey),
+        signature: 'NEEDS AIRDROP — simulation failed (no SOL)',
+        url: null,
+        payload,
+      };
+    }
+    return {
+      status: 'error',
+      simulated: false,
+      unfunded: false,
+      pubkey,
+      faucetUrl: null,
+      signature: `FAILED — ${msg.slice(0, 80)}`,
+      url: null,
+      payload,
+    };
+  }
 }

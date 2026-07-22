@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { skipActive } from './film/shots.js';
 
 const ease = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const easeOut = (t) => 1 - Math.pow(1 - t, 3);
@@ -7,6 +8,7 @@ function tween(duration, step) {
   return new Promise((resolve) => {
     const t0 = performance.now();
     const tick = () => {
+      if (skipActive()) { step(1); return resolve(); }
       const k = Math.min(1, (performance.now() - t0) / (duration * 1000));
       step(k);
       if (k < 1) requestAnimationFrame(tick);

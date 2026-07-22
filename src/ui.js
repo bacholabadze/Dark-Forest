@@ -3,6 +3,17 @@ import { skipActive, clearSkip } from './film/shots.js';
 
 const $ = (id) => document.getElementById(id);
 
+/** Poll skipActive until fired once; returns a cancel fn. */
+function onSkip(fn) {
+  const id = setInterval(() => {
+    if (!skipActive()) return;
+    clearInterval(id);
+    clearSkip();
+    fn();
+  }, 80);
+  return () => clearInterval(id);
+}
+
 const DICT = {
   en: {
     brand: 'DARK FOREST BOTS · ELECTRIC',
@@ -95,8 +106,10 @@ const DICT = {
     explorer: 'VIEW ON SOLANA EXPLORER',
     patrolLog: 'PATROL LOG',
     sending: 'Writing containment record to Solana devnet…',
-    simulated: 'SIMULATED — no funded devnet keypair configured.',
+    simulated: 'SIMULATED — no VITE_SOLANA_SECRET configured (demo mode).',
+    unfunded: (pk) => `NOT SENT — 0 SOL. Open faucet (GitHub sign-in), airdrop 1 SOL to ${pk}, reload, retry.`,
     real: 'Written to Solana devnet. Open the link and verify it yourself.',
+    faucet: 'OPEN DEVNET FAUCET',
     continue: 'CONTINUE',
     m1: 'THE DARK FOREST EXTENDS BEYOND SOLANA.',
     m2: 'RANGER ONE MUST GO TO <em>THE MOON</em>.',
@@ -192,8 +205,10 @@ const DICT = {
     explorer: 'ნახვა SOLANA EXPLORER-ზე',
     patrolLog: 'პატრულის ჟურნალი',
     sending: 'იზოლაციის ჩანაწერი ინახება Solana devnet-ზე…',
-    simulated: 'სიმულირებულია — დაფინანსებული devnet გასაღები არ არის მითითებული.',
+    simulated: 'სიმულირებულია — VITE_SOLANA_SECRET არ არის მითითებული (დემო რეჟიმი).',
+    unfunded: (pk) => `არ გაიგზავნა — 0 SOL. გახსენით faucet (GitHub), დააფინანსეთ ${pk} 1 SOL-ით, გადატვირთეთ.`,
     real: 'ჩაწერილია Solana devnet-ზე. გახსენით ბმული და თავად გადაამოწმეთ.',
+    faucet: 'DEVNET FAUCET-ის გახსნა',
     continue: 'გაგრძელება',
     m1: 'ბნელი ტყე SOLANA-ს ფარგლებს სცდება.',
     m2: 'რეინჯერი ერთი უნდა წავიდეს <em>მთვარეზე</em>.',
@@ -360,10 +375,15 @@ export function askChoice(titleKey, options, recommended = 0, seconds = 8) {
     $('choice-title').textContent = t(titleKey);
     const btns = [$('choice-a'), $('choice-b')];
     let timer = null, ticker = null;
+    let picked = false;
 
     const pick = (id) => {
+      if (picked) return;
+      picked = true;
       clearTimeout(timer);
       clearInterval(ticker);
+      stopSkip();
+      window.__overlaySkip = null;
       el.classList.add('hidden');
       resolve(id);
     };
@@ -382,6 +402,10 @@ export function askChoice(titleKey, options, recommended = 0, seconds = 8) {
       cd.textContent = t('autopick', left);
     }, 1000);
     timer = setTimeout(() => pick(options[recommended].id), seconds * 1000);
+
+    // ENTER / Skip → recommended option so the demo never stalls
+    const stopSkip = onSkip(() => pick(options[recommended].id));
+    window.__overlaySkip = () => pick(options[recommended].id);
   });
 }
 
@@ -394,7 +418,18 @@ export function endingArchive() {
     grid.innerHTML = '';
     $('sc2-lines').innerHTML = t('archSealed');
     $('sc2-go').classList.add('hidden');
-    setTimeout(() => { el.classList.add('hidden'); resolve(); }, 2400);
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      stopSkip();
+      window.__overlaySkip = null;
+      el.classList.add('hidden');
+      resolve();
+    };
+    const stopSkip = onSkip(finish);
+    window.__overlaySkip = finish;
+    setTimeout(finish, 2400);
   });
 }
 
@@ -421,25 +456,32 @@ export function scene1(onFlash) {
     $('sc1-rows').innerHTML = '';
 
     let finished = false;
+    let revealed = false;
+    let endTimer = null;
     const done = () => {
       if (finished) return;
       finished = true;
+      clearTimeout(endTimer);
+      stopSkip();
+      window.__overlaySkip = null;
       el.classList.add('hidden');
       resolve();
     };
 
-    const watch = setInterval(() => {
-      if (!skipActive()) return;
-      clearInterval(watch);
+    const skipNow = () => {
+      if (finished) return;
       clearSkip();
       onFlash?.();
       done();
-    }, 120);
+    };
+    const stopSkip = onSkip(skipNow);
+    window.__overlaySkip = skipNow;
 
     $('sc1-confirm').onclick = () => {
       $('sc1-confirm').disabled = true;
       let v = CASE.expected;
       const step = setInterval(() => {
+        if (finished) return clearInterval(step);
         v -= 24;
         if (v <= CASE.received) { v = CASE.received; clearInterval(step); reveal(); }
         $('sc1-recv').textContent = `${Math.round(v).toLocaleString()} ${CASE.victimToken}`;
@@ -448,7 +490,8 @@ export function scene1(onFlash) {
     };
 
     function reveal() {
-      clearInterval(watch);
+      if (revealed || finished) return;
+      revealed = true;
       onFlash?.();
       $('sc1-alert').classList.remove('hidden');
       $('sandwich-explain')?.classList.remove('hidden');
@@ -464,7 +507,7 @@ export function scene1(onFlash) {
         d.innerHTML = `<span>${who}</span><span>${what}</span><span>slot ${CASE.slot}</span>`;
         $('sc1-rows').appendChild(d);
       });
-      setTimeout(done, 3400);
+      endTimer = setTimeout(done, 3400);
     }
   });
 }
@@ -487,22 +530,30 @@ export function scene2() {
     const finish = () => {
       if (finished) return;
       finished = true;
+      stopSkip();
+      window.__overlaySkip = null;
       el.classList.add('hidden');
       resolve();
     };
+
+    const skipNow = () => {
+      clearSkip();
+      $('sc2-lines').innerHTML = seq.join('<br>');
+      if (![...grid.querySelectorAll('i.hero')].length) {
+        const hero = document.createElement('i');
+        hero.className = 'hero';
+        grid.appendChild(hero);
+      }
+      finish();
+    };
+    const stopSkip = onSkip(skipNow);
+    window.__overlaySkip = skipNow;
 
     const seq = [t('l1'), t('l2'), t('l3')];
     let i = 0;
     const next = () => {
       if (finished) return;
-      if (skipActive()) {
-        clearSkip();
-        $('sc2-lines').innerHTML = seq.join('<br>');
-        const hero = document.createElement('i');
-        hero.className = 'hero';
-        grid.appendChild(hero);
-        return finish();
-      }
+      if (skipActive()) return skipNow();
       if (i >= seq.length) {
         const hero = document.createElement('i');
         hero.className = 'hero';
@@ -518,11 +569,6 @@ export function scene2() {
       setTimeout(next, 1150);
     };
     setTimeout(next, 800);
-
-    const watch = setInterval(() => {
-      if (finished) return clearInterval(watch);
-      if (skipActive()) { clearSkip(); clearInterval(watch); finish(); }
-    }, 120);
   });
 }
 
@@ -541,6 +587,7 @@ export function openPuzzle() {
     slots.forEach((s) => { s.className = 'slot'; [...s.querySelectorAll('.card')].forEach((c) => c.remove()); });
 
     let attempts = 0;
+    let closed = false;
 
     TXS.forEach((tx) => {
       const c = document.createElement('div');
@@ -588,22 +635,37 @@ export function openPuzzle() {
       if (attempts >= 2) setTimeout(() => autoSolve(), 900);
     }
 
-    function autoSolve() {
+    function autoSolve(quick = false) {
+      if (closed) return;
       const cards = [...document.querySelectorAll('.card')]
         .sort((a, b) => a.dataset.correct - b.dataset.correct);
       slots.forEach((s, i) => { s.className = 'slot'; s.appendChild(cards[i]); });
-      win(t('auto'));
+      win(t('auto'), quick);
     }
 
-    function win(text) {
+    function win(text, quick = false) {
+      if (closed) return;
+      closed = true;
+      stopSkip();
+      window.__overlaySkip = null;
       slots.forEach((s) => { s.className = 'slot ok'; });
       [...document.querySelectorAll('.card')].forEach((c) => { c.draggable = false; });
       msg.textContent = text;
       msg.className = 'msg ok';
-      setTimeout(() => { el.classList.add('hidden'); resolve(); }, 1900);
+      setTimeout(() => { el.classList.add('hidden'); resolve(); }, quick ? 180 : 1900);
     }
 
-    window.__puzzleResolve = () => { el.classList.add('hidden'); resolve(); };
+    const skipNow = () => { clearSkip(); autoSolve(true); };
+    const stopSkip = onSkip(skipNow);
+    window.__overlaySkip = skipNow;
+    window.__puzzleResolve = () => {
+      if (closed) return;
+      closed = true;
+      stopSkip();
+      window.__overlaySkip = null;
+      el.classList.add('hidden');
+      resolve();
+    };
   });
 }
 
@@ -615,23 +677,50 @@ export function showRecord(result, guiltyDef) {
     $('r-close').style.display = '';
     $('r-case').textContent = `#${CASE.id}`;
     $('r-subj').textContent = guiltyDef.short;
-    $('r-net').textContent = result.simulated ? 'devnet (not sent)' : 'solana devnet';
+    $('r-net').textContent = result.status === 'ok' || (!result.simulated && result.url)
+      ? 'solana devnet'
+      : result.unfunded
+        ? 'devnet (unfunded)'
+        : 'devnet (not sent)';
     $('r-sig').textContent = result.signature;
 
     const link = $('r-link');
+    const faucet = $('r-faucet');
     const note = $('r-note');
     if (result.url) {
       link.href = result.url;
       link.classList.remove('hidden');
+      faucet?.classList.add('hidden');
       note.textContent = t('real');
       note.className = 'note';
+    } else if (result.unfunded && result.pubkey) {
+      link.classList.add('hidden');
+      if (faucet) {
+        faucet.href = result.faucetUrl || 'https://faucet.solana.com/';
+        faucet.textContent = t('faucet');
+        faucet.classList.remove('hidden');
+      }
+      note.textContent = t('unfunded', result.pubkey);
+      note.className = 'note warn';
     } else {
       link.classList.add('hidden');
+      faucet?.classList.add('hidden');
       note.textContent = t('simulated');
       note.className = 'note warn';
     }
 
-    $('r-close').onclick = () => { el.classList.add('hidden'); resolve(); };
+    let closed = false;
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      stopSkip();
+      window.__overlaySkip = null;
+      el.classList.add('hidden');
+      resolve();
+    };
+    const stopSkip = onSkip(close);
+    window.__overlaySkip = close;
+    $('r-close').onclick = close;
   });
 }
 
@@ -650,6 +739,7 @@ export function sendingRecord() {
   $('r-net').textContent = 'solana devnet';
   $('r-sig').textContent = '…';
   $('r-link').classList.add('hidden');
+  $('r-faucet')?.classList.add('hidden');
   $('r-note').textContent = t('sending');
   $('r-note').className = 'note';
   $('r-close').style.display = 'none';
@@ -663,11 +753,31 @@ export function scene7(onReplay) {
   lines.innerHTML = '';
   const seq = [t('m1'), t('m2')];
   let i = 0;
+  let finished = false;
   const next = () => {
-    if (i >= seq.length) return;
+    if (finished) return;
+    if (skipActive() || i >= seq.length) {
+      lines.innerHTML = seq.join('<br>');
+      finished = true;
+      stopSkip();
+      window.__overlaySkip = null;
+      return;
+    }
     lines.innerHTML = seq.slice(0, i + 1).join('<br>');
     i++;
     setTimeout(next, 1500);
+  };
+  const stopSkip = onSkip(() => {
+    lines.innerHTML = seq.join('<br>');
+    finished = true;
+    window.__overlaySkip = null;
+  });
+  window.__overlaySkip = () => {
+    clearSkip();
+    lines.innerHTML = seq.join('<br>');
+    finished = true;
+    stopSkip();
+    window.__overlaySkip = null;
   };
   setTimeout(next, 900);
 

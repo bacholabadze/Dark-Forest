@@ -69,8 +69,11 @@ addEventListener('keydown', (e) => {
     if (k === 'KeyE') interactPressed = true;
     if (k === 'Space') containPressed = true;
   }
-  // ENTER or Skip button fast-forwards the current film scene
-  if (k === 'Enter' && filmState.active) requestSkip();
+  // ENTER always requests skip — film shots AND blocking overlays (choice/puzzle/record)
+  if (k === 'Enter') {
+    requestSkip();
+    window.__overlaySkip?.();
+  }
   keys.add(k);
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) e.preventDefault();
 });
@@ -236,7 +239,15 @@ async function runStory() {
       try {
         result = await recordContainment({ caseId: CASE.id, subject: g.def.short });
       } catch (e) {
-        result = { simulated: true, signature: `FAILED — ${String(e.message).slice(0, 60)}`, url: null };
+        result = {
+          status: 'error',
+          simulated: false,
+          unfunded: false,
+          pubkey: chainState.payer,
+          faucetUrl: null,
+          signature: `FAILED — ${String(e.message || e).slice(0, 80)}`,
+          url: null,
+        };
       }
       narration.then(({ text, live }) => ui.showJournal(text, live));
       await ui.showRecord(result, g.def);
@@ -391,9 +402,10 @@ window.__test = {
 
 // ── boot ────────────────────────────────────────────────────────────────────
 (async function boot() {
-  // Skip button — same path as ENTER
+  // Skip button — same path as ENTER (works during overlays too)
   document.getElementById('skipbtn')?.addEventListener('click', () => {
-    if (filmState.active) requestSkip();
+    requestSkip();
+    window.__overlaySkip?.();
   });
 
   ui.loader.progress(0.15, 'load1');

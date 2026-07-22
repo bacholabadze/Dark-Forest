@@ -104,54 +104,40 @@ export async function freeze(dur = 2.2) {
 }
 
 /** Two-frame hard black — the smash cut. */
-export function smashCut(dur = 0.14) {
+export async function smashCut(dur = 0.14) {
   const el = document.getElementById('smash');
   el.classList.add('on');
-  return new Promise((r) => setTimeout(() => {
-    el.classList.remove('on');
-    r();
-  }, dur * 1000));
+  await hold(dur);
+  el.classList.remove('on');
 }
 
 /** Typewriter title card over black. lines: array of strings (HTML ok). */
-export function titleCard(lines, holdMs = 2400) {
-  return new Promise((resolve) => {
-    const el = document.getElementById('titlecard');
-    el.classList.remove('hidden');
-    const box = el.querySelector('.tc-lines');
-    box.innerHTML = '';
-    let i = 0;
-    const next = () => {
-      if (skipRequested || i >= lines.length) {
-        box.innerHTML = lines.join('<br>');
-        setTimeout(() => { el.classList.add('hidden'); resolve(); }, skipRequested ? 120 : holdMs);
-        return;
-      }
-      box.innerHTML = lines.slice(0, i + 1).join('<br>');
-      i++;
-      setTimeout(next, 900);
-    };
-    next();
-  });
+export async function titleCard(lines, holdMs = 2400) {
+  const el = document.getElementById('titlecard');
+  el.classList.remove('hidden');
+  const box = el.querySelector('.tc-lines');
+  box.innerHTML = '';
+  for (let i = 0; i < lines.length; i++) {
+    if (skipRequested) break;
+    box.innerHTML = lines.slice(0, i + 1).join('<br>');
+    await hold(0.9);
+  }
+  box.innerHTML = lines.join('<br>');
+  await hold(skipRequested ? 0.12 : holdMs / 1000);
+  el.classList.add('hidden');
 }
 
 /** Heartbeat ticker — slow fact drip over black (the P1 cold open). */
-export function heartbeat(facts, stepMs = 1100) {
-  return new Promise((resolve) => {
-    const el = document.getElementById('titlecard');
-    el.classList.remove('hidden');
-    const box = el.querySelector('.tc-lines');
-    box.innerHTML = '';
-    let i = 0;
-    const next = () => {
-      if (skipRequested || i >= facts.length) {
-        setTimeout(() => { el.classList.add('hidden'); resolve(); }, skipRequested ? 100 : 700);
-        return;
-      }
-      box.innerHTML = `<span class="hb">${facts.slice(0, i + 1).join('&ensp;·&ensp;')}</span>`;
-      i++;
-      setTimeout(next, stepMs);
-    };
-    next();
-  });
+export async function heartbeat(facts, stepMs = 1100) {
+  const el = document.getElementById('titlecard');
+  el.classList.remove('hidden');
+  const box = el.querySelector('.tc-lines');
+  box.innerHTML = '';
+  for (let i = 0; i < facts.length; i++) {
+    if (skipRequested) break;
+    box.innerHTML = `<span class="hb">${facts.slice(0, i + 1).join('&ensp;·&ensp;')}</span>`;
+    await hold(stepMs / 1000);
+  }
+  await hold(skipRequested ? 0.1 : 0.7);
+  el.classList.add('hidden');
 }

@@ -39,9 +39,12 @@ export async function runTimeline(steps, ctx) {
     } else if (step.type === 'choice') {
       ctx.player.frozen = true;
       clearSkip();
+      film.skipHint(true);
       ctx.choices[step.id] = await askChoice(
         step.prompt, step.options, step.recommended ?? 0, step.seconds ?? 8
       );
+      film.skipHint(false);
+      clearSkip();
     } else if (step.type === 'game') {
       ctx.state = step.state;
       ctx.player.frozen = false;
