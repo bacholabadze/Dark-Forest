@@ -1,0 +1,21 @@
+# BOT #343 Electric — project rules
+
+## Stack
+- Vite + vanilla JS + three.js ^0.178
+- @solana/web3.js ^1
+- No React. No TypeScript. No wallet adapter.
+
+## Look — Electric Forest
+- Void #0B1026, sky #1A0A3E, cyan #00F0FF, magenta #FF2EEA
+- Ambient 2.0 + HemisphereLight. Bloom strength 1.2 threshold 0.35
+- Per-character PointLights. HSL lightness floor 0.55
+
+## Rules
+1. Placeholder first — game playable before GLBs load
+2. Never fake chain success — SIMULATED when no keypair
+3. LIVE badge only when Helius socket is open
+4. File ownership: world/player/camera/cinematic vs game/ui vs chain/assets
+5. No globe, no moon level, no mint, no wallet connect
+
+## Honesty language
+Say: tracked and visualised a detected sandwich. Never: we stop attacks.
