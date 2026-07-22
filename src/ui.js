@@ -30,6 +30,28 @@ const DICT = {
     capReveal: 'BOT #343 — <em>RANGER ONE</em> · FIRST OF THE DEFENDERS',
     capOrbit: 'SOLANA · <em>DEX CITY</em> · EVERY LIGHT IS A TRANSACTION',
     capDive: 'DESCENDING INTO <em>THE DARK FOREST</em>',
+    tcName: 'DARK FOREST · <em>BOT #343</em>',
+    tc12h: '12 HOURS EARLIER',
+    capFreeze: 'ONE LEAP FROM <em>CONTAINMENT</em>',
+    capVictim: 'A CIVILIAN SWAP ENTERS <em>THE FOREST</em>',
+    capBracket: 'THE SANDWICH <em>CLOSES</em>',
+    cap2021: '2021 · THE FIRST HARVESTERS',
+    cap2023: '2023 · 342 BOTS DOCUMENTED',
+    cap2026: '2026 · SOLANA — <em>TODAY</em>',
+    capStakeout: 'STAKEOUT · IT DOES NOT KNOW WE ARE WATCHING',
+    capCaught: '<em>CAUGHT IN THE ACT</em>',
+    capLoop: 'THIS IS WHERE <em>YOU CAME IN</em>',
+    capTribunal: 'TRIBUNAL · THE VAULT ACCEPTS ITS <em>343rd</em>',
+    capRehab: 'BOT #344 — <em>SECOND DEFENDER</em>',
+    archSealed: 'CASE SEALED · <em>THE ARCHIVE GROWS</em>',
+    choiceApproach: 'RANGER, CHOOSE THE APPROACH',
+    optStakeout: 'STAKEOUT<span>watch it strike — gather proof</span>',
+    optPursuit: 'PURSUIT<span>strike now — no warning</span>',
+    choiceVerdict: 'PASS THE VERDICT',
+    optTribunal: 'TRIBUNAL<span>contain it forever</span>',
+    optRehab: 'REHABILITATE<span>recruit a second defender</span>',
+    autopick: (n) => `AUTO-DECIDES IN ${n}s`,
+    skipHint: 'ENTER · SKIP SCENE',
   },
   ka: {
     objScan: 'დაასკანერე სამივე საეჭვო ბოტი. მიუახლოვდი და დააჭირე E.',
@@ -58,6 +80,28 @@ const DICT = {
     capReveal: 'ბოტი #343 — <em>RANGER ONE</em> · პირველი დამცველი',
     capOrbit: 'SOLANA · <em>DEX CITY</em> · ყოველი შუქი — ტრანზაქციაა',
     capDive: 'ვეშვებით <em>ბნელ ტყეში</em>',
+    tcName: 'DARK FOREST · <em>ბოტი #343</em>',
+    tc12h: '12 საათით ადრე',
+    capFreeze: 'ერთი ნახტომი <em>იზოლაციამდე</em>',
+    capVictim: 'უბრალო სვოპი შედის <em>ბნელ ტყეში</em>',
+    capBracket: 'სენდვიჩი <em>იკვრება</em>',
+    cap2021: '2021 · პირველი მომპოვებლები',
+    cap2023: '2023 · დაფიქსირდა 342 ბოტი',
+    cap2026: '2026 · SOLANA — <em>დღეს</em>',
+    capStakeout: 'ჩასაფრება · მან არ იცის, რომ ვუყურებთ',
+    capCaught: '<em>დანაშაულზეა წასწრებული</em>',
+    capLoop: 'აქ დაიწყო <em>შენი ისტორია</em>',
+    capTribunal: 'ტრიბუნალი · საცავი იღებს <em>343-ეს</em>',
+    capRehab: 'ბოტი #344 — <em>მეორე დამცველი</em>',
+    archSealed: 'საქმე დახურულია · <em>არქივი იზრდება</em>',
+    choiceApproach: 'რეინჯერო, აირჩიე მიდგომა',
+    optStakeout: 'ჩასაფრება<span>დააკვირდი თავდასხმას — შეაგროვე მტკიცებულება</span>',
+    optPursuit: 'დევნა<span>შეუტიე ახლავე — გაფრთხილების გარეშე</span>',
+    choiceVerdict: 'გამოიტანე განაჩენი',
+    optTribunal: 'ტრიბუნალი<span>სამუდამო იზოლაცია</span>',
+    optRehab: 'რეაბილიტაცია<span>გახადე მეორე დამცველი</span>',
+    autopick: (n) => `ავტომატური არჩევანი ${n} წმ-ში`,
+    skipHint: 'ENTER · სცენის გამოტოვება',
   },
 };
 
@@ -107,7 +151,81 @@ export const film = {
     el.classList.remove('hidden');
     el.classList.add('show');
   },
+  skipHint(on) {
+    const el = $('skiphint');
+    el.textContent = t('skipHint');
+    el.classList.toggle('hidden', !on);
+  },
 };
+
+/** Act I mini terminal — the swap watches from a corner while the 3D city
+ *  plays the real drama, then zooms fullscreen for the CONFIRM click. */
+export function terminalMini(on) {
+  const el = $('sc1');
+  if (on) {
+    $('sc1-recv').textContent = `${CASE.expected.toLocaleString()} ${CASE.victimToken}`;
+    $('sc1-recv').classList.remove('bad');
+    $('sc1-alert').classList.add('hidden');
+    $('sc1-rows').innerHTML = '';
+    $('sc1-confirm').disabled = true;
+    el.classList.add('mini');
+    el.classList.remove('hidden');
+  } else {
+    el.classList.remove('mini');
+  }
+}
+
+/** Choice point — two buttons, countdown auto-picks the recommended option. */
+export function askChoice(titleKey, options, recommended = 0, seconds = 8) {
+  return new Promise((resolve) => {
+    const el = $('choice');
+    el.classList.remove('hidden');
+    $('choice-title').textContent = t(titleKey);
+    const btns = [$('choice-a'), $('choice-b')];
+    let timer = null, ticker = null;
+
+    const pick = (id) => {
+      clearTimeout(timer);
+      clearInterval(ticker);
+      el.classList.add('hidden');
+      resolve(id);
+    };
+
+    options.forEach((o, i) => {
+      btns[i].innerHTML = t(o.label);
+      btns[i].classList.toggle('rec', i === recommended);
+      btns[i].onclick = () => pick(o.id);
+    });
+
+    let left = seconds;
+    const cd = $('choice-count');
+    cd.textContent = t('autopick', left);
+    ticker = setInterval(() => {
+      left = Math.max(0, left - 1);
+      cd.textContent = t('autopick', left);
+    }, 1000);
+    timer = setTimeout(() => pick(options[recommended].id), seconds * 1000);
+  });
+}
+
+/** Tribunal epilogue — the archive grid grows to 343, the last cell red. */
+export function endingArchive() {
+  return new Promise((resolve) => {
+    const el = $('sc2');
+    el.classList.remove('hidden');
+    const grid = $('sc2-grid');
+    grid.innerHTML = '';
+    for (let i = 0; i < 343; i++) {
+      const s = document.createElement('i');
+      s.style.animationDelay = `${i * 0.002}s`;
+      if (i === 342) s.className = 'villain';
+      grid.appendChild(s);
+    }
+    $('sc2-lines').innerHTML = t('archSealed');
+    $('sc2-go').classList.add('hidden');
+    setTimeout(() => { el.classList.add('hidden'); resolve(); }, 3000);
+  });
+}
 
 export function showStrip(def) {
   $('strip-name').textContent = def.name;

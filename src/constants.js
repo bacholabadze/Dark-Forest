@@ -47,14 +47,19 @@ export const MODELS = {
   botB: '/models/bot-b.glb',
 };
 
-// Three real attack cases from the 2021 registry — one is drawn per run, so
-// every playthrough tells a different story (the "variations" beat).
+// Three real attack cases from the 2021 registry.
 export const CASES = [
   { id: 1804, victimToken: 'MOON', expected: 1000, received: 640, slot: 4891 },
   { id: 2117, victimToken: 'RAY',  expected: 5200, received: 3410, slot: 7723 },
   { id: 951,  victimToken: 'ORCA', expected: 880,  received: 597,  slot: 3308 },
 ];
-export const CASE = CASES[Math.floor(Math.random() * CASES.length)];
+
+// Demo builds PIN the case so the rehearsed pitch numbers match the screen.
+// VITE_CASE_INDEX=-1 restores the random "variations" draw for post-event play.
+const CASE_INDEX = Number(import.meta.env.VITE_CASE_INDEX ?? 0);
+export const CASE = CASE_INDEX >= 0
+  ? CASES[CASE_INDEX % CASES.length]
+  : CASES[Math.floor(Math.random() * CASES.length)];
 
 export const BOTS = [
   {
@@ -95,10 +100,14 @@ export const BOTS = [
   },
 ];
 
+// Puzzle cards derive from the active case — otherwise a RAY/ORCA run shows
+// MOON amounts and the reconstruction contradicts scene 1 on screen.
+const amt = (n) => `${Math.round(n).toLocaleString()} ${CASE.victimToken}`;
+
 export const TXS = [
-  { id: 'back',  kind: 'SELL', amount: '1,340 MOON', who: 'bot 0x2222…', slot: CASE.slot, correct: 2 },
-  { id: 'vict',  kind: 'BUY',  amount: '1,000 MOON', who: 'YOU',         slot: CASE.slot, correct: 1 },
-  { id: 'front', kind: 'BUY',  amount: '8,000 MOON', who: 'bot 0x2222…', slot: CASE.slot, correct: 0 },
+  { id: 'back',  kind: 'SELL', amount: amt(CASE.expected * 1.34), who: 'bot 0x2222…', slot: CASE.slot, correct: 2 },
+  { id: 'vict',  kind: 'BUY',  amount: amt(CASE.expected),        who: 'YOU',         slot: CASE.slot, correct: 1 },
+  { id: 'front', kind: 'BUY',  amount: amt(CASE.expected * 8),    who: 'bot 0x2222…', slot: CASE.slot, correct: 0 },
 ];
 
 export const STATE = {

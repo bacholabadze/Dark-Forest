@@ -7,7 +7,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 
-import { PALETTE, MOVE, CASE, STATE } from './constants.js';
+import { MOVE, CASE, STATE } from './constants.js';
 import { buildWorld, createTrails } from './world.js';
 import { createPlayer, updatePlayer, loadPlayerModel } from './player.js';
 import { createCameraRig, updateCamera } from './camera.js';
@@ -17,6 +17,8 @@ import { narrateCase } from './ai.js';
 import { descent, ascent, punchIn, reveal } from './cinematic.js';
 import { createLightning } from './lightning.js';
 import { runTimeline } from './director.js';
+import { filmState, requestSkip, hold } from './film/shots.js';
+import { createFilmScenes } from './film/scenes.js';
 import * as ui from './ui.js';
 
 // ── renderer ────────────────────────────────────────────────────────────────
@@ -67,6 +69,8 @@ addEventListener('keydown', (e) => {
     if (k === 'KeyE') interactPressed = true;
     if (k === 'Space') containPressed = true;
   }
+  // ENTER fast-forwards the current film scene — the stage demo stays in control
+  if (k === 'Enter' && filmState.active) requestSkip();
   keys.add(k);
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) e.preventDefault();
 });
@@ -113,7 +117,7 @@ function refreshLang() {
 }
 ui.initLang(refreshLang);
 
-async function onScan(bot) {
+function onScan(bot) {
   if (bot.scanned) return;
   bot.scanned = true;
   scanned++;
@@ -122,75 +126,121 @@ async function onScan(bot) {
   setTimeout(ui.hideStrip, 4200);
 
   if (scanned >= 3) {
-    ctx.state = STATE.PUZZLE;
+    ctx.state = STATE.PUZZLE;   // hands control back to the director timeline
     refreshLang();
-    setTimeout(async () => {
-      player.frozen = true;
-      await ui.openPuzzle();
-      player.frozen = false;
-      const g = guilty();
-      await punchIn(rig, g.root.position);
-      g.fleeing = true;
-      lightning.setActive(true);
-      ctx.state = STATE.CHASE;
-      refreshLang();
-    }, 1400);
   }
 }
 
-async function onContain(bot) {
+function onContain(bot) {
   if (ctx.state !== STATE.CHASE || !bot.def.guilty) return;
-  ctx.state = STATE.DONE;
   bot.fleeing = false;
   bot.caged = true;
   cage = createCage(scene, bot.root.position.clone());
   player.frozen = true;
-  refreshLang();
   lightning.sandwichFlash();
-
-  ui.sendingRecord();
-  // Narration runs concurrently with the devnet write — no added wait.
-  const narration = narrateCase({
-    caseId: CASE.id, subject: bot.def.short, slot: CASE.slot,
-    token: CASE.victimToken, expected: CASE.expected, received: CASE.received,
-  });
-  let result;
-  try {
-    result = await recordContainment({ caseId: CASE.id, subject: bot.def.short });
-  } catch (e) {
-    result = { simulated: true, signature: `FAILED — ${String(e.message).slice(0, 60)}`, url: null };
-  }
-  narration.then(({ text, live }) => ui.showJournal(text, live));
-  await ui.showRecord(result, bot.def);
-
-  await ascent(rig, player.pos);
-  ui.scene7(() => location.reload());
+  ctx.state = STATE.DONE;       // director takes over: echo → record → verdict
+  refreshLang();
 }
 
-async function runIntro() {
+// ── the sujet graph — Nolan structure, run by the director ──────────────────
+async function runStory() {
+  const film = createFilmScenes({ scene, rig, player, bots, lightning });
   lightning.setActive(true);
-  await ui.scene1(() => lightning.sandwichFlash());
-  await ui.scene2();
 
-  // Scene 2.5 — hero reveal: slow turntable around Ranger One
-  ui.film.letterbox(true);
-  ui.film.caption('capReveal');
-  await reveal(rig, player.pos.clone());
-  ui.film.caption(null);
+  const timeline = [
+    // PROLOGUE — flash-forward chase, the ending shown first
+    { type: 'film', fn: () => film.prologue() },
 
-  // Scene 3 — two-stage descent with captions
-  await descent(rig, (stage) => {
-    ui.film.caption(stage === 0 ? 'capOrbit' : 'capDive');
-  });
-  ui.film.caption(null);
-  ui.film.letterbox(false);
+    // ACT I — the victim: 3D sandwich plays while the terminal watches small,
+    // then zooms fullscreen for the one CONFIRM click
+    { type: 'film', fn: async () => {
+      ui.terminalMini(true);
+      await film.sandwich();
+      ui.terminalMini(false);
+      await ui.scene1(() => lightning.sandwichFlash());
+    } },
 
-  ui.hud.show();
-  refreshLang();
-  lightning.setActive(false);
-  ctx.state = STATE.SCAN;
-  player.frozen = false;
-  refreshLang();
+    // ACT II — archive history + year-stamp montage + hero reveal + descent
+    { type: 'film', fn: async () => {
+      await ui.scene2();
+      await film.montage();
+      ui.film.letterbox(true);
+      ui.film.caption('capReveal');
+      await reveal(rig, player.pos.clone());
+      ui.film.caption(null);
+      await descent(rig, (stage) => {
+        ui.film.caption(stage === 0 ? 'capOrbit' : 'capDive');
+      });
+      ui.film.caption(null);
+      ui.film.letterbox(false);
+    } },
+
+    // GAMEPLAY — scan the district
+    { type: 'game', state: STATE.SCAN, until: STATE.PUZZLE, onEnter: () => {
+      rig.manual = false;
+      ui.hud.show();
+      lightning.setActive(false);
+      refreshLang();
+    } },
+
+    // The console reconstruction
+    { type: 'film', fn: async () => {
+      await hold(1.2);
+      await ui.openPuzzle();
+    } },
+
+    // CHOICE 1 — how do we take it
+    { type: 'choice', id: 'approach', prompt: 'choiceApproach', recommended: 0, options: [
+      { id: 'stakeout', label: 'optStakeout' },
+      { id: 'pursuit', label: 'optPursuit' },
+    ] },
+    { type: 'film', fn: async (c) => {
+      if (c.choices.approach === 'stakeout') await film.stakeout();
+      else await punchIn(rig, guilty().root.position);
+      guilty().fleeing = true;
+      lightning.setActive(true);
+    } },
+
+    // GAMEPLAY — the chase, ends when SPACE contains the guilty bot
+    { type: 'game', state: STATE.CHASE, until: STATE.DONE, onEnter: () => {
+      rig.manual = false;
+      refreshLang();
+    } },
+
+    // CAPTURE — the prologue framing repeats (loop closes), then the record
+    { type: 'film', fn: async () => {
+      await film.captureEcho(cage.position);
+      ui.sendingRecord();
+      const g = guilty();
+      // Narration runs concurrently with the devnet write — no added wait.
+      const narration = narrateCase({
+        caseId: CASE.id, subject: g.def.short, slot: CASE.slot,
+        token: CASE.victimToken, expected: CASE.expected, received: CASE.received,
+      });
+      let result;
+      try {
+        result = await recordContainment({ caseId: CASE.id, subject: g.def.short });
+      } catch (e) {
+        result = { simulated: true, signature: `FAILED — ${String(e.message).slice(0, 60)}`, url: null };
+      }
+      narration.then(({ text, live }) => ui.showJournal(text, live));
+      await ui.showRecord(result, g.def);
+    } },
+
+    // CHOICE 2 — the verdict, the room argues about this one
+    { type: 'choice', id: 'verdict', prompt: 'choiceVerdict', recommended: 0, options: [
+      { id: 'tribunal', label: 'optTribunal' },
+      { id: 'rehabilitate', label: 'optRehab' },
+    ] },
+    { type: 'film', fn: async (c) => {
+      if (c.choices.verdict === 'tribunal') await film.tribunal(cage);
+      else await film.rehabilitate(cage);
+      await ascent(rig, player.pos);
+      ui.scene7(() => location.reload());
+    } },
+  ];
+
+  await runTimeline(timeline, ctx);
 }
 
 // ── loop ────────────────────────────────────────────────────────────────────
@@ -202,10 +252,19 @@ function frame() {
   const dt = Math.min(0.05, clock.getDelta());
   const t = clock.elapsedTime;
 
-  readInput();
-  updatePlayer(player, dt, input, rig.yaw);
+  // Freeze frame — the world clock stops, only the render keeps breathing
+  if (filmState.paused) { composer.render(); return; }
+
+  if (filmState.active) {
+    // Film mode: actors.js drives roots; we only tick the mixers (exactly once)
+    if (player.anim?.mixer) player.anim.mixer.update(dt);
+    for (const b of bots) if (b.anim?.mixer) b.anim.mixer.update(dt);
+  } else {
+    readInput();
+    updatePlayer(player, dt, input, rig.yaw);
+    updateBots(bots, dt, t, player.pos);
+  }
   updateCamera(rig, dt, player.pos, player.sprinting);
-  updateBots(bots, dt, t, player.pos);
   trails.update(dt);
   lightning.update(dt);
 
@@ -216,7 +275,9 @@ function frame() {
     for (let i = 0; i < 3; i++) cage.userData[`r${i}`].rotation.z += dt * (0.6 + i * 0.4);
   }
 
-  if (ctx.state === STATE.SCAN) {
+  if (filmState.active) {
+    ui.hud.prompt(null);
+  } else if (ctx.state === STATE.SCAN) {
     const near = nearestBot(bots, player.pos);
     ui.hud.prompt(near && !near.scanned ? ui.t('pressE') : null);
     if (interactPressed && near) onScan(near);
@@ -260,6 +321,11 @@ window.__test = {
     player.pos.set(g.root.position.x + 2.0, 0, g.root.position.z + 2.0);
     player.root.position.copy(player.pos);
   },
+  skip() { requestSkip(); },
+  choose(which) {
+    document.getElementById(which === 'b' ? 'choice-b' : 'choice-a')?.click();
+  },
+  choices: () => ctx.choices || {},
   solvePuzzle() {
     const slots = [...document.querySelectorAll('.slot')];
     const cards = [...document.querySelectorAll('.card')]
@@ -298,8 +364,5 @@ window.__test = {
   }).then((ok) => console.info(ok ? '[bots] models swapped in' : '[bots] running on placeholders'));
 
   ui.loader.progress(1, 'READY');
-  ui.loader.ready(() => runIntro());
+  ui.loader.ready(() => runStory());
 })();
-
-void runTimeline;
-void PALETTE;
