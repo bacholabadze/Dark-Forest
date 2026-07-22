@@ -1,12 +1,64 @@
 /* Electric Forest — brighter sci-fi, readable on projector */
+
+/* Self-hosted fonts (SIL OFL 1.1 — licenses in /public/fonts/). FiraGO
+   carries properly drawn Georgian mkhedruli; Fira Code covers Latin mono. */
+@font-face{font-family:"FiraGO";src:url("/fonts/FiraGO-Regular.woff2") format("woff2");
+  font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"FiraGO";src:url("/fonts/FiraGO-Medium.woff2") format("woff2");
+  font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:"FiraGO";src:url("/fonts/FiraGO-Bold.woff2") format("woff2");
+  font-weight:600 800;font-style:normal;font-display:swap}
+@font-face{font-family:"Fira Code";src:url("/fonts/FiraCode-Regular.woff2") format("woff2");
+  font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"Fira Code";src:url("/fonts/FiraCode-Bold.woff2") format("woff2");
+  font-weight:700;font-style:normal;font-display:swap}
+
 :root{
   --void:#0B1026; --sky:#1A0A3E; --panel:#152040; --line:#2A4080;
   --blue:#007EFF; --purple:#7450FF; --cyan:#00F0FF; --magenta:#FF2EEA;
   --ink:#E8F0FF; --dim:#9AADD4; --red:#C8372D;
   --sol-a:#9945FF; --sol-b:#14F195;
-  --mono:"SF Mono",Menlo,ui-monospace,monospace;
-  --sans:"Helvetica Neue","Noto Sans Georgian",Helvetica,Arial,sans-serif;
+  --mono:"Fira Code","SF Mono",Menlo,ui-monospace,monospace;
+  --sans:"FiraGO","Helvetica Neue","Noto Sans Georgian",Helvetica,Arial,sans-serif;
 }
+/* Georgian has no monospace worth shipping — FiraGO plays both roles. */
+:root[data-lang="ka"]{
+  --mono:"FiraGO","Noto Sans Georgian",sans-serif;
+  --sans:"FiraGO","Noto Sans Georgian",sans-serif;
+}
+/* Mkhedruli letterforms fall apart at caps-style tracking — cut it to ~⅓
+   and let FiraGO's weight carry the emphasis instead. */
+:root[data-lang="ka"] .brand{letter-spacing:.10em}
+:root[data-lang="ka"] .brand.big{letter-spacing:.09em}
+:root[data-lang="ka"] .loadbox .sub{letter-spacing:.09em}
+:root[data-lang="ka"] .endcard .title{letter-spacing:.10em}
+:root[data-lang="ka"] .term-hd{letter-spacing:.08em}
+:root[data-lang="ka"] .qr-label,
+:root[data-lang="ka"] .journal-hd,
+:root[data-lang="ka"] .slot>span,
+:root[data-lang="ka"] .loadtxt,
+:root[data-lang="ka"] .strip-ft,
+:root[data-lang="ka"] .strip-hd i,
+:root[data-lang="ka"] .console.rec td,
+:root[data-lang="ka"] .strip td{letter-spacing:.06em}
+:root[data-lang="ka"] .live,
+:root[data-lang="ka"] .txcount,
+:root[data-lang="ka"] .chip,
+:root[data-lang="ka"] .scancount,
+:root[data-lang="ka"] .caption,
+:root[data-lang="ka"] .alert,
+:root[data-lang="ka"] .prompt,
+:root[data-lang="ka"] .notice,
+:root[data-lang="ka"] .confirm{letter-spacing:.05em}
+:root[data-lang="ka"] .lines{letter-spacing:.04em}
+:root[data-lang="ka"] .objective,
+:root[data-lang="ka"] .keys,
+:root[data-lang="ka"] .msg{letter-spacing:.03em}
+/* No uppercase in Georgian — Medium weight stands in for the caps rhythm. */
+:root[data-lang="ka"] .objective,
+:root[data-lang="ka"] .prompt,
+:root[data-lang="ka"] .notice,
+:root[data-lang="ka"] .loadtxt{font-weight:500}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;background:var(--void);color:var(--ink);
   font-family:var(--mono);font-size:14px;-webkit-font-smoothing:antialiased}
@@ -40,6 +92,10 @@ button{font:inherit;cursor:pointer}
   border:1px solid var(--cyan);background:rgba(11,16,38,.88);color:var(--cyan);
   padding:9px 16px;font-size:12px;letter-spacing:.13em;backdrop-filter:blur(3px);
   box-shadow:0 0 24px rgba(0,240,255,.25)}
+.notice{position:absolute;left:50%;bottom:140px;transform:translateX(-50%);
+  border:1px solid var(--sol-b);background:rgba(11,16,38,.88);color:var(--sol-b);
+  padding:9px 16px;font-size:12px;letter-spacing:.13em;backdrop-filter:blur(3px);
+  box-shadow:0 0 24px rgba(20,241,149,.25);animation:fadein .2s}
 
 .strip{position:absolute;right:24px;top:50%;transform:translateY(-50%);
   width:290px;border:1px solid var(--line);background:linear-gradient(160deg,rgba(0,240,255,.12),rgba(21,32,64,.94));
@@ -80,20 +136,45 @@ button{font:inherit;cursor:pointer}
   box-shadow:0 0 20px rgba(255,46,234,.3)}
 @keyframes flash{50%{opacity:.35}}
 .txrows{margin-top:16px;font-size:10.5px;line-height:2}
-.txrows div{display:flex;justify-content:space-between;padding:3px 8px;opacity:0;animation:fadein .4s forwards}
+/* Fixed fractions so the middle (amount) column lines up across rows regardless of text width */
+.txrows div{display:grid;grid-template-columns:1fr 1fr 1fr;padding:3px 8px;opacity:0;animation:fadein .4s forwards}
+.txrows div span:first-child{text-align:left}
+.txrows div span:nth-child(2){text-align:left}
+.txrows div span:last-child{text-align:right}
 .txrows .bot{color:var(--red);background:rgba(200,55,45,.12)}
 .txrows .you{color:#fff;background:rgba(0,240,255,.15)}
 @keyframes fadein{to{opacity:1}}
 
-.archive{text-align:center;width:min(760px,92vw);max-height:90vh;overflow:auto;padding:12px}
-.botgrid{display:grid;grid-template-columns:repeat(19,1fr);gap:2px;margin-bottom:20px;max-height:38vh;overflow:hidden}
-.botgrid i{aspect-ratio:1;background:rgba(0,240,255,.15);border:1px solid rgba(0,240,255,.28);
-  opacity:0;animation:fadein .02s forwards}
-.botgrid i.hero{background:var(--sol-b);border-color:var(--sol-b);box-shadow:0 0 16px var(--sol-b)}
+.archive{text-align:center;width:min(760px,92vw);max-height:90vh;overflow:hidden;padding:12px}
+/* Threat census: 342 = 18×19 exactly — eighteen full red rows, and the hero
+   lands alone on row 19. Fixed 12px cells keep it a dense block, all rows
+   visible (the old 38vh clip cut the hero off). */
+.botgrid{display:grid;grid-template-columns:repeat(19,12px);gap:2px;justify-content:center;margin-bottom:22px}
+.botgrid i{aspect-ratio:1;background:rgba(200,55,45,.22);opacity:0;
+  animation:fadein .02s forwards;transition:opacity .6s}
+.botgrid i.hot{animation:fadein .02s forwards,hotpulse 2.8s ease-in-out infinite}
+@keyframes hotpulse{50%{background:rgba(200,55,45,.72);box-shadow:0 0 8px rgba(200,55,45,.45)}}
+.botgrid i.hero{background:var(--sol-b);box-shadow:0 0 16px var(--sol-b);
+  opacity:0;animation:fadein .4s .2s forwards}
+/* The crush-to-black beat. animation:none releases the fadein fill so the
+   .6s opacity transition can run; the hero keeps its own ignition. */
+.botgrid.dim i{animation:none;opacity:.08}
+.botgrid.dim i.hero{animation:fadein .4s .2s forwards}
+.census{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--red);
+  margin-bottom:12px;min-height:1.4em;font-variant-numeric:tabular-nums;transition:opacity .6s}
+.census b{font-weight:700}
 .lines{font-family:var(--sans);font-weight:800;font-size:clamp(17px,3.2vw,30px);letter-spacing:.10em;
   color:#fff;line-height:1.5;min-height:2.6em;text-shadow:0 0 20px rgba(0,240,255,.3)}
 .lines.big{font-size:clamp(15px,2.6vw,25px)}
 .lines em{font-style:normal;color:var(--magenta)}
+/* Scene-2-only terminal treatment — sc7 keeps the warm centred glow. */
+.lines.term{font-family:var(--mono);font-weight:600;font-size:clamp(13px,2.1vw,18px);
+  text-align:left;letter-spacing:.02em;text-shadow:0 2px 12px rgba(0,0,0,.8);
+  min-height:4.5em;width:min(42ch,86vw);margin:0 auto;line-height:1.55}
+.caret{display:inline-block;width:.55em;height:1.05em;background:var(--ink);
+  vertical-align:text-bottom;margin-left:2px;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+:root[data-lang="ka"] .lines.term{letter-spacing:.02em}
 .archive .confirm{margin-top:30px}
 
 .console{width:min(700px,94vw);border:1px solid var(--line);
@@ -171,7 +252,8 @@ button{font:inherit;cursor:pointer}
 @media (max-width:760px){
   .strip{right:12px;width:min(250px,66vw)}
   .hud-br{display:none}
-  .botgrid{grid-template-columns:repeat(14,1fr)}
+  /* Keep 19 columns — shrinking cells preserves 18 rows + lone hero row. */
+  .botgrid{grid-template-columns:repeat(19,8px);gap:1px}
   .slots,.tray{grid-template-columns:1fr;gap:8px}
   .slot{min-height:64px}
 }

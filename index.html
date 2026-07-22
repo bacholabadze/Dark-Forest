@@ -17,7 +17,7 @@
 
   <div id="hud" class="hidden">
     <div class="hud-tl">
-      <div class="brand">DARK FOREST <b>BOTS</b> · ELECTRIC</div>
+      <div class="brand" data-i18n-html="brand">DARK FOREST <b>BOTS</b> · ELECTRIC</div>
       <div id="objective" class="objective"></div>
     </div>
     <div class="hud-tr">
@@ -32,46 +32,48 @@
       <div id="keys" class="keys"></div>
     </div>
     <div id="prompt" class="prompt hidden"></div>
+    <div id="notice" class="notice hidden" data-i18n="noMatch"></div>
   </div>
 
   <aside id="strip" class="strip hidden">
-    <div class="strip-hd"><span id="strip-name"></span><i>SCAN COMPLETE</i></div>
+    <div class="strip-hd"><span id="strip-name"></span><i data-i18n="scanComplete">SCAN COMPLETE</i></div>
     <table>
-      <tr><td>ADDRESS</td><th id="s-addr"></th></tr>
-      <tr><td>ATTACKS</td><th id="s-atk"></th></tr>
-      <tr><td>TOTAL</td><th id="s-tot"></th></tr>
-      <tr><td>FIRST SEEN</td><th id="s-seen"></th></tr>
+      <tr><td data-i18n="stripAddr">ADDRESS</td><th id="s-addr"></th></tr>
+      <tr><td data-i18n="stripAtk">ATTACKS</td><th id="s-atk"></th></tr>
+      <tr><td data-i18n="stripTot">TOTAL</td><th id="s-tot"></th></tr>
+      <tr><td data-i18n="stripSeen">FIRST SEEN</td><th id="s-seen"></th></tr>
     </table>
-    <div class="strip-ft">DARK FOREST BOTS · 2021 REGISTRY</div>
+    <div class="strip-ft" data-i18n="stripFt">DARK FOREST BOTS · 2021 REGISTRY</div>
   </aside>
 
   <div id="sc1" class="overlay hidden">
     <div class="term">
-      <div class="term-hd">SOLANA · SWAP</div>
-      <div class="row"><span>YOU PAY</span><b>2.00 SOL</b></div>
-      <div class="row"><span>YOU RECEIVE</span><b id="sc1-recv">1,000 MOON</b></div>
-      <button id="sc1-confirm" class="confirm">CONFIRM</button>
-      <div id="sc1-alert" class="alert hidden">⚠ SANDWICH DETECTED</div>
+      <div class="term-hd" data-i18n="swapHd">SOLANA · SWAP</div>
+      <div class="row"><span data-i18n="youPay">YOU PAY</span><b>2.00 SOL</b></div>
+      <div class="row"><span data-i18n="youRecv">YOU RECEIVE</span><b id="sc1-recv">1,000 MOON</b></div>
+      <button id="sc1-confirm" class="confirm" data-i18n="confirm">CONFIRM</button>
+      <div id="sc1-alert" class="alert hidden" data-i18n="sandwich">⚠ SANDWICH DETECTED</div>
       <div id="sc1-rows" class="txrows"></div>
     </div>
   </div>
 
   <div id="sc2" class="overlay hidden">
     <div class="archive">
+      <div id="sc2-count" class="census"></div>
       <div id="sc2-grid" class="botgrid"></div>
-      <div id="sc2-lines" class="lines"></div>
-      <button id="sc2-go" class="confirm hidden">ACTIVATE</button>
+      <div id="sc2-lines" class="lines term"></div>
+      <button id="sc2-go" class="confirm hidden" data-i18n="activate">ACTIVATE</button>
     </div>
   </div>
 
   <div id="puzzle" class="overlay hidden">
     <div class="console">
-      <h2>RECONSTRUCT THE ATTACK</h2>
+      <h2 data-i18n="puzzleTitle">RECONSTRUCT THE ATTACK</h2>
       <p id="puzzle-hint"></p>
       <div class="slots">
-        <div class="slot" data-i="0"><span>FRONT-RUN</span></div>
-        <div class="slot" data-i="1"><span>VICTIM</span></div>
-        <div class="slot" data-i="2"><span>BACK-RUN</span></div>
+        <div class="slot" data-i="0"><span data-i18n="slotFront">FRONT-RUN</span></div>
+        <div class="slot" data-i="1"><span data-i18n="slotVictim">VICTIM</span></div>
+        <div class="slot" data-i="2"><span data-i18n="slotBack">BACK-RUN</span></div>
       </div>
       <div id="tray" class="tray"></div>
       <div id="puzzle-msg" class="msg"></div>
@@ -80,21 +82,21 @@
 
   <div id="record" class="overlay hidden">
     <div class="console rec">
-      <h2>CONTAINMENT RECORD</h2>
+      <h2 data-i18n="recTitle">CONTAINMENT RECORD</h2>
       <table>
-        <tr><td>CASE</td><th id="r-case"></th></tr>
-        <tr><td>SUBJECT</td><th id="r-subj"></th></tr>
-        <tr><td>RANGER</td><th>#343</th></tr>
-        <tr><td>NETWORK</td><th id="r-net"></th></tr>
-        <tr><td>SIGNATURE</td><th id="r-sig" class="sig"></th></tr>
+        <tr><td data-i18n="recCase">CASE</td><th id="r-case"></th></tr>
+        <tr><td data-i18n="recSubj">SUBJECT</td><th id="r-subj"></th></tr>
+        <tr><td data-i18n="recRanger">RANGER</td><th>#343</th></tr>
+        <tr><td data-i18n="recNet">NETWORK</td><th id="r-net"></th></tr>
+        <tr><td data-i18n="recSig">SIGNATURE</td><th id="r-sig" class="sig"></th></tr>
       </table>
-      <a id="r-link" class="confirm link hidden" target="_blank" rel="noopener">VIEW ON SOLANA EXPLORER</a>
+      <a id="r-link" class="confirm link hidden" target="_blank" rel="noopener" data-i18n="viewExplorer">VIEW ON SOLANA EXPLORER</a>
       <div id="r-note" class="note"></div>
       <div id="r-journal" class="journal hidden">
-        <div class="journal-hd">PATROL LOG · <span id="r-journal-src">SCRIPTED</span></div>
+        <div class="journal-hd"><span data-i18n="patrolLog">PATROL LOG</span> · <span id="r-journal-src">SCRIPTED</span></div>
         <p id="r-journal-txt"></p>
       </div>
-      <button id="r-close" class="confirm ghost">CONTINUE</button>
+      <button id="r-close" class="confirm ghost" data-i18n="continueBtn">CONTINUE</button>
     </div>
   </div>
 
@@ -102,22 +104,22 @@
     <div class="endcard">
       <div class="moon"></div>
       <div id="sc7-lines" class="lines big"></div>
-      <div class="title">DARK FOREST · <b>BOT #343</b></div>
+      <div class="title" data-i18n-html="endTitle">DARK FOREST · <b>BOT #343</b></div>
       <div class="qr-wrap">
         <img id="qr" class="qr" alt="Play QR" width="120" height="120" />
-        <p class="qr-label">SCAN TO PLAY</p>
+        <p class="qr-label" data-i18n="scanToPlay">SCAN TO PLAY</p>
       </div>
-      <button id="sc7-again" class="confirm ghost">REPLAY</button>
+      <button id="sc7-again" class="confirm ghost" data-i18n="replay">REPLAY</button>
     </div>
   </div>
 
   <div id="loader" class="overlay">
     <div class="loadbox">
-      <div class="brand big">DARK FOREST <b>BOTS</b></div>
-      <div class="sub">ELECTRIC · SEASON 2 · SOLANA</div>
+      <div class="brand big" data-i18n-html="brandBig">DARK FOREST <b>BOTS</b></div>
+      <div class="sub" data-i18n="sub">ELECTRIC · SEASON 2 · SOLANA</div>
       <div class="bar"><i id="bar"></i></div>
-      <div id="loadtxt" class="loadtxt">INITIALISING</div>
-      <button id="begin" class="confirm hidden">BEGIN</button>
+      <div id="loadtxt" class="loadtxt" data-i18n="initialising">INITIALISING</div>
+      <button id="begin" class="confirm hidden" data-i18n="begin">BEGIN</button>
     </div>
   </div>
 

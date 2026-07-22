@@ -6,10 +6,15 @@ Interactive film-game for Cursor Georgia @ BTU. Vite + three.js + Helius + Solan
 
 ```bash
 npm install
-npm run optimize-models   # remesh Meshy GLBs → public/models/
+npm run optimize-models   # remesh Meshy GLBs from assets-src/ → public/models/
 npm run dev               # http://localhost:8660
 npm run drive             # headless full-loop smoke test
 ```
+
+`optimize-models` reads from `assets-src/` in the repo root (gitignored) —
+drop your Meshy character folders there (e.g. `assets-src/Meshy_AI_Hexagon_Sentinel_biped/…`).
+The script exits non-zero if a source is missing. The optimised GLBs are
+already committed in `public/models/`, so this step is only needed to rebuild.
 
 ## Env (optional)
 
@@ -23,7 +28,7 @@ Without keys: procedural trails + honest `SIMULATED` containment record.
 
 ## Controls
 
-`WASD` move · `SHIFT` sprint · `SPACE` jump/contain · `E` scan · drag look · wheel zoom
+`WASD` move · `SHIFT` sprint · `SPACE` jump · `E` scan · `F` fire bolt · drag look · wheel zoom
 
 ## Stack
 

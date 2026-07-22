@@ -10,7 +10,14 @@ export function createCameraRig(camera) {
     dist: CAM.DIST,
     target: new THREE.Vector3(),
     manual: false,
+    lookHold: 0,   // seconds of manual-drag priority before follow resumes
   };
+}
+
+function wrapAngle(d) {
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d;
 }
 
 function clampAgainstBuildings(origin, dir, maxDist) {
@@ -35,11 +42,28 @@ function clampAgainstBuildings(origin, dir, maxDist) {
   return Math.max(CAM.MIN, best);
 }
 
-export function updateCamera(rig, dt, playerPos, sprinting) {
+export function updateCamera(rig, dt, player, input) {
   if (rig.manual) return;
 
+  if (rig.lookHold > 0) rig.lookHold -= dt;
+
+  // Auto-follow: swing behind the player at constant angular velocity.
+  // Gated on forward dominance — the heading feeds back into movement via
+  // camYaw, and pure-lateral input has no stable equilibrium (it would spin
+  // the player in a circle forever). Equilibrium is yaw = heading − π.
+  if (player.moving && rig.lookHold <= 0) {
+    const fwdWeight = input.z > 0 ? input.z / (Math.abs(input.x) + input.z) : 0;
+    if (fwdWeight > 0) {
+      const step = CAM.FOLLOW * fwdWeight * dt;
+      const d = wrapAngle((player.heading - Math.PI) - rig.yaw);
+      if (Math.abs(d) > CAM.FOLLOW_DEADZONE) {
+        rig.yaw += Math.sign(d) * Math.min(Math.abs(d), step);
+      }
+    }
+  }
+
   rig.target.lerp(
-    new THREE.Vector3(playerPos.x, playerPos.y + CAM.HEIGHT, playerPos.z),
+    new THREE.Vector3(player.pos.x, player.pos.y + CAM.HEIGHT, player.pos.z),
     Math.min(1, CAM.LERP * dt)
   );
 
@@ -53,7 +77,7 @@ export function updateCamera(rig, dt, playerPos, sprinting) {
   rig.camera.position.copy(rig.target).addScaledVector(dir, dist);
   rig.camera.lookAt(rig.target);
 
-  const want = sprinting ? MOVE.FOV_SPRINT : MOVE.FOV;
+  const want = player.sprinting ? MOVE.FOV_SPRINT : MOVE.FOV;
   rig.camera.fov += (want - rig.camera.fov) * Math.min(1, 4 * dt);
   rig.camera.updateProjectionMatrix();
 }

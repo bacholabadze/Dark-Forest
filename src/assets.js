@@ -88,6 +88,9 @@ export function normalise(obj, targetHeight) {
   obj.position.x -= c.x;
   obj.position.z -= c.z;
   obj.position.y -= box2.min.y;
+  // Stable origin for the idle breathe — offsets apply relative to this
+  // instead of fighting the normalisation.
+  obj.userData.baseY = obj.position.y;
 
   // Skinned meshes animate outside their bind-pose bounds; without this the
   // camera frustum culls them mid-walk and the character blinks out.
@@ -131,13 +134,27 @@ export function countTriangles(obj) {
   return Math.round(t);
 }
 
+/**
+ * Where to park a walk cycle when a rig has no idle clip: the fraction of the
+ * cycle at the "passing pose" — legs aligned under the body, which reads as
+ * standing. Contact poses (t=0, t=0.5) read as a mid-stride lunge. Tunable.
+ */
+export const PASSING_POSE = 0.26;
+
+const IDLE_KEYS = ['idle', 'stand'];
+
+/** True when the rig ships a genuine idle/stand clip. */
+export function hasRealIdle(clips) {
+  return !!clips?.some((c) => IDLE_KEYS.some((k) => c.name.toLowerCase().includes(k)));
+}
+
 /** Pick walk/run/idle clip from GLB animations. */
 export function pickClip(clips, prefer = 'walk') {
   if (!clips?.length) return null;
   const lower = (n) => n.toLowerCase();
   const find = (keys) => clips.find((c) => keys.some((k) => lower(c.name).includes(k)));
   if (prefer === 'run') return find(['run', 'sprint', 'jog']) || find(['walk']) || clips[0];
-  if (prefer === 'idle') return find(['idle', 'stand']) || clips[0];
+  if (prefer === 'idle') return find(IDLE_KEYS) || clips[0];
   return find(['walk', 'walking']) || find(['run']) || clips[0];
 }
 
@@ -152,6 +169,23 @@ export function bindAnimations(root, clips, prefer = 'walk') {
 
 export function setAnimState(anim, prefer, fade = 0.2) {
   if (!anim?.mixer) return;
+
+  // These rigs ship only a walk clip. "Idle" would fall through to that same
+  // clip and march in place — instead park it at the passing pose. The mixer
+  // keeps applying the frozen pose every update, so the stance holds.
+  if (prefer === 'idle' && !hasRealIdle(anim.clips)) {
+    if (!anim.parked) {
+      anim.action.paused = true;
+      anim.action.time = anim.clip.duration * PASSING_POSE;
+      anim.parked = true;
+    }
+    return;
+  }
+  if (anim.parked) {
+    anim.action.paused = false;
+    anim.parked = false;
+  }
+
   const clip = pickClip(anim.clips, prefer);
   if (!clip) return;
   if (clip === anim.clip) {
