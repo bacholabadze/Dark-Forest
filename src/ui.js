@@ -55,8 +55,10 @@ const DICT = {
     pressSpace: 'PRESS  SPACE  ·  CONTAIN',
     keys: 'WASD move (camera follows) · SHIFT sprint · SPACE jump<br>DRAG mouse look · E interact',
     live: 'LIVE · MAINNET',
-    offline: 'STREAM OFFLINE',
+    offline: 'DEMO TRAILS · NOT LIVE',
     txcount: (n) => `TX <b>${n.toLocaleString()}</b>`,
+    proof: 'MAINNET PROOF',
+    viewSolscan: 'VIEW ON SOLSCAN',
     stripDone: 'SCAN COMPLETE',
     stripAddr: 'ADDRESS',
     stripAtk: 'ATTACKS',
@@ -150,8 +152,10 @@ const DICT = {
     pressSpace: 'დააჭირეთ SPACE-ს · იზოლირება',
     keys: 'WASD მოძრაობა (კამერა მიჰყვება) · SHIFT სირბილი · SPACE ნახტომი<br>DRAG მიმოხედვა · E მოქმედება',
     live: 'ლაივი · MAINNET',
-    offline: 'ნაკადი გათიშულია',
+    offline: 'დემო ტრეილები · არა ლაივი',
     txcount: (n) => `ტრანზაქცია <b>${n.toLocaleString()}</b>`,
+    proof: 'MAINNET PROOF',
+    viewSolscan: 'ნახვა SOLSCAN-ზე',
     stripDone: 'სკანირება დასრულებულია',
     stripAddr: 'მისამართი',
     stripAtk: 'შეტევები',
@@ -239,6 +243,23 @@ export const hud = {
     el.classList.toggle('on', on);
     el.classList.toggle('off', !on);
     el.querySelector('span').textContent = on ? t('live') : t('offline');
+  },
+  /** Show last real mainnet sig + Solscan link (hidden when demo/offline). */
+  proof(sig) {
+    const chip = $('mainnet-proof');
+    const link = $('proof-link');
+    if (!chip || !link) return;
+    if (!sig) {
+      chip.classList.add('hidden');
+      return;
+    }
+    const short = `${sig.slice(0, 4)}…${sig.slice(-4)}`;
+    chip.classList.remove('hidden');
+    chip.querySelector('[data-proof-label]').textContent = t('proof');
+    chip.querySelector('[data-proof-sig]').textContent = short;
+    link.href = `https://solscan.io/tx/${sig}`;
+    link.title = sig;
+    link.textContent = t('viewSolscan');
   },
   dbg(txt) { $('dbg').textContent = txt; },
 };

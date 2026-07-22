@@ -17,7 +17,7 @@ button{font:inherit;cursor:pointer}
 
 #hud{position:absolute;inset:0;pointer-events:none;padding:18px 20px}
 .hud-tl{position:absolute;top:18px;left:20px}
-.hud-tr{position:absolute;top:18px;right:20px;display:flex;gap:10px;align-items:center;pointer-events:auto}
+.hud-tr{position:absolute;top:18px;right:20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;max-width:min(70vw,560px);pointer-events:auto}
 .hud-bl{position:absolute;bottom:18px;left:20px}
 .hud-br{position:absolute;bottom:18px;right:20px;text-align:right}
 .brand{font-family:var(--sans);font-weight:800;font-size:11px;letter-spacing:.30em;color:#fff}
@@ -36,6 +36,12 @@ button{font:inherit;cursor:pointer}
   border-radius:3px;color:#5A7098}
 .live.on{color:var(--sol-b);border-color:rgba(20,241,149,.45);animation:pulse 2s infinite}
 @keyframes pulse{50%{opacity:.55}}
+.proof{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:.12em;
+  padding:5px 9px;border:1px solid rgba(20,241,149,.4);border-radius:3px;color:var(--sol-b);
+  background:rgba(20,241,149,.06);max-width:min(52vw,420px)}
+.proof code{color:var(--cyan);font-family:ui-monospace,Menlo,monospace;letter-spacing:.04em}
+.proof a{color:var(--cyan);text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
+.proof a:hover{color:#fff}
 .prompt{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);
   border:1px solid var(--cyan);background:rgba(11,16,38,.88);color:var(--cyan);
   padding:9px 16px;font-size:12px;letter-spacing:.13em;backdrop-filter:blur(3px);

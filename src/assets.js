@@ -152,20 +152,25 @@ export function bindAnimations(root, clips, prefer = 'walk') {
 
 export function setAnimState(anim, prefer, fade = 0.2) {
   if (!anim?.mixer) return;
-  const lower = (n) => n.toLowerCase();
   const hasIdle = anim.clips.some((c) => /idle|stand/i.test(c.name));
 
-  // Meshy packs often ship walk/run only. Falling back to walk for "idle"
-  // is what made bots look like they run in place after a waypoint ends.
+  // Meshy packs often ship walk/run only. Pausing mid-stride looks frozen
+  // mid-step — reset to time 0 (near bind / feet-together) then pause.
   if (prefer === 'idle' && !hasIdle) {
-    anim.action.paused = true;
-    anim.action.timeScale = 0;
-    anim.frozenIdle = true;
+    if (!anim.frozenIdle) {
+      anim.action.reset();
+      anim.action.time = 0;
+      anim.action.paused = true;
+      anim.action.timeScale = 0;
+      anim.mixer.update(0);
+      anim.frozenIdle = true;
+    }
     return;
   }
 
   if (anim.frozenIdle) {
     anim.action.paused = false;
+    anim.action.timeScale = 1;
     anim.frozenIdle = false;
   }
 
@@ -173,6 +178,7 @@ export function setAnimState(anim, prefer, fade = 0.2) {
   if (!clip) return;
   if (clip === anim.clip) {
     anim.action.timeScale = prefer === 'run' ? 1.35 : prefer === 'idle' ? 0.85 : 1;
+    anim.action.paused = false;
     return;
   }
   const next = anim.mixer.clipAction(clip);

@@ -112,6 +112,7 @@ function refreshLang() {
   ui.hud.scanned(scanned);
   ui.hud.live(chainState.streamLive);
   ui.hud.txCount?.(chainState.txCount);
+  ui.hud.proof?.(chainState.streamLive ? chainState.lastSigs[0] : null);
   if (ctx.state === STATE.SCAN) {
     ui.hud.objective(ui.t('objScan'));
     ui.hud.tip(ui.t('tipScan'));
@@ -403,6 +404,7 @@ window.__test = {
   setInterval(() => {
     ui.hud.live(chainState.streamLive);
     ui.hud.txCount?.(chainState.txCount);
+    ui.hud.proof?.(chainState.streamLive ? chainState.lastSigs[0] : null);
   }, 1000);
 
   ui.loader.progress(0.55, 'load3');

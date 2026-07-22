@@ -33,19 +33,21 @@ function makeSignTexture(title, sub) {
   const c = document.createElement('canvas');
   c.width = 2048; c.height = 512;
   const g = c.getContext('2d');
-  // Keep luminance under bloom threshold (~0.35) so text stays sharp
+  // Flat matte paint — stay under bloom threshold; no glow/shadow
   g.fillStyle = '#060a14';
   g.fillRect(0, 0, 2048, 512);
-  g.strokeStyle = '#1a6a72';
+  g.strokeStyle = '#1a4048';
   g.lineWidth = 14;
   g.strokeRect(40, 40, 1968, 432);
   g.textAlign = 'center';
   g.textBaseline = 'middle';
+  g.shadowColor = 'transparent';
+  g.shadowBlur = 0;
   g.font = 'bold 190px Helvetica, Arial, sans-serif';
-  g.fillStyle = '#b8f0f8';
+  g.fillStyle = '#6a8890';
   g.fillText(title, 1024, 200);
   g.font = 'bold 64px Helvetica, Arial, sans-serif';
-  g.fillStyle = '#5ec9a0';
+  g.fillStyle = '#4a7868';
   g.fillText(sub, 1024, 365);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -71,7 +73,7 @@ function makeSkySolanaTexture(logoImg) {
   let x = (W - total) / 2;
 
   if (logoImg) {
-    g.globalAlpha = 0.72;
+    g.globalAlpha = 0.55;
     g.drawImage(logoImg, x, (H - logoH) / 2, logoW, logoH);
     g.globalAlpha = 1;
     x += logoW + gap;
@@ -80,14 +82,13 @@ function makeSkySolanaTexture(logoImg) {
   const tx = x + tw / 2;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  // Keep luminance under bloom threshold (~0.35) — readable, not blown-out
-  g.shadowColor = 'rgba(153,69,255,0.18)';
-  g.shadowBlur = 10;
-  g.strokeStyle = 'rgba(20,180,140,0.45)';
-  g.lineWidth = 8;
-  g.strokeText(text, tx, H / 2);
+  // Flat readable lockup — no shadow/glow (bloom blowout killer)
+  g.shadowColor = 'transparent';
   g.shadowBlur = 0;
-  g.fillStyle = '#7eb0a8';
+  g.strokeStyle = 'rgba(40,90,80,0.55)';
+  g.lineWidth = 6;
+  g.strokeText(text, tx, H / 2);
+  g.fillStyle = '#5a7880';
   g.fillText(text, tx, H / 2);
 
   const tex = new THREE.CanvasTexture(c);
@@ -100,7 +101,7 @@ function addSkySolana(group) {
   const mat = new THREE.MeshBasicMaterial({
     map: makeSkySolanaTexture(null),
     transparent: true,
-    opacity: 0.82,
+    opacity: 0.68,
     toneMapped: false,
     depthWrite: false,
     side: THREE.DoubleSide,
@@ -156,6 +157,8 @@ function buildRaydium(group) {
   const signMat = new THREE.MeshBasicMaterial({
     map: makeSignTexture('RAYDIUM DEX', 'SOLANA · AMM'),
     toneMapped: false,
+    transparent: true,
+    opacity: 0.92,
   });
   const plateMat = new THREE.MeshBasicMaterial({ color: 0x060a14, toneMapped: false });
 
@@ -215,9 +218,8 @@ function buildRaydium(group) {
 
 export function buildWorld(scene) {
   scene.background = new THREE.Color(PALETTE.void);
-  // Density tuned for the aerial establishing shot — 0.009 blacked out the
-  // city from 120 units up; the descent must show a glowing skyline.
-  scene.fog = new THREE.FogExp2(PALETTE.sky, 0.0045);
+  // Soft indigo fog — lighter night sky, neon city stays readable
+  scene.fog = new THREE.FogExp2(PALETTE.sky, 0.0038);
   addStarfield(scene);
 
   const group = new THREE.Group();

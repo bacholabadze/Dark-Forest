@@ -1,7 +1,7 @@
 // Electric Forest palette — brighter sci-fi, readable on projector
 export const PALETTE = {
-  void:     0x0B1026,
-  sky:      0x1A0A3E,
+  void:     0x101C3A, // sci-fi night — deep blue-indigo (not void black)
+  sky:      0x1A2A52, // softer indigo fog; keeps neon city readable
   panel:    0x152040,
   deepBlue: 0x30348B,
   blue:     0x007EFF,
@@ -80,9 +80,9 @@ export const BOTS = [
     firstSeen: 2021,
     guilty: true,
     modelKey: 'guilty',
-    // Closest to Raydium entrance — plaza waypoints only (open ground)
-    pos: [16, 0, -2],
-    waypoints: [[16, -2], [12, 4], [18, 10], [14, 6], [16, -2]],
+    // Closest to Raydium — closed plaza circuit (continuous walk, no waits)
+    pos: [14, 0, 0],
+    waypoints: [[14, 0], [10, 6], [16, 12], [24, 10], [28, 2], [22, -4], [14, 0]],
   },
   {
     id: 'bot-a',
@@ -94,8 +94,8 @@ export const BOTS = [
     firstSeen: 2021,
     guilty: false,
     modelKey: 'botA',
-    pos: [30, 0, 4],
-    waypoints: [[30, 4], [34, 8], [28, 12], [32, 2], [30, 4]],
+    pos: [32, 0, 2],
+    waypoints: [[32, 2], [36, 6], [34, 12], [26, 14], [22, 8], [28, 0], [32, 2]],
   },
   {
     id: 'bot-b',
@@ -107,8 +107,8 @@ export const BOTS = [
     firstSeen: 2022,
     guilty: false,
     modelKey: 'botB',
-    pos: [22, 0, 8],
-    waypoints: [[22, 8], [26, 11], [18, 12], [20, 6], [22, 8]],
+    pos: [18, 0, 10],
+    waypoints: [[18, 10], [24, 14], [30, 10], [28, 4], [20, 2], [14, 6], [18, 10]],
   },
 ];
 

@@ -18,14 +18,32 @@ if (SECRET) {
 
 export const chainState = {
   streamLive: false,
+  mode: HELIUS_KEY ? 'connecting' : 'demo', // 'live' | 'demo' | 'connecting'
   canSend: !!payer,
   payer: payer ? payer.publicKey.toBase58() : null,
   txCount: 0,
+  /** Last real mainnet signatures from Helius logsSubscribe (newest first). */
+  lastSigs: [],
 };
+
+export function solscanUrl(sig) {
+  return `https://solscan.io/tx/${sig}`;
+}
+
+export function explorerUrl(sig) {
+  return `https://explorer.solana.com/tx/${sig}`;
+}
+
+function rememberSig(sig) {
+  if (!sig || typeof sig !== 'string') return;
+  chainState.lastSigs = [sig, ...chainState.lastSigs.filter((s) => s !== sig)].slice(0, 5);
+}
 
 export function startTransactionStream(onTx) {
   if (!HELIUS_KEY) {
-    console.info('[chain] no Helius key — procedural trails, LIVE badge off');
+    console.info('[chain] no Helius key — procedural trails, DEMO badge');
+    chainState.mode = 'demo';
+    chainState.streamLive = false;
     return startProcedural(onTx);
   }
 
@@ -36,6 +54,7 @@ export function startTransactionStream(onTx) {
     ws.onopen = () => {
       retry = 0;
       chainState.streamLive = true;
+      chainState.mode = 'live';
       ws.send(JSON.stringify({
         jsonrpc: '2.0', id: 1, method: 'logsSubscribe',
         params: [{ mentions: [DEX_PROGRAM] }, { commitment: 'confirmed' }],
@@ -46,16 +65,22 @@ export function startTransactionStream(onTx) {
       try {
         const msg = JSON.parse(ev.data);
         if (msg.method === 'logsNotification') {
+          const sig = msg.params?.result?.value?.signature;
+          rememberSig(sig);
           chainState.txCount++;
-          onTx();
+          onTx({ signature: sig, live: true });
         }
       } catch { /* ignore */ }
     };
 
-    ws.onerror = () => { chainState.streamLive = false; };
+    ws.onerror = () => {
+      chainState.streamLive = false;
+      chainState.mode = 'demo';
+    };
     ws.onclose = () => {
       chainState.streamLive = false;
       if (closed) return;
+      chainState.mode = 'connecting';
       retry = Math.min(retry + 1, 5);
       setTimeout(connect, 400 * retry);
     };
@@ -68,7 +93,7 @@ export function startTransactionStream(onTx) {
 function startProcedural(onTx) {
   const id = setInterval(() => {
     const burst = 1 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < burst; i++) setTimeout(onTx, Math.random() * 260);
+    for (let i = 0; i < burst; i++) setTimeout(() => onTx({ live: false }), Math.random() * 260);
   }, 320);
   return () => clearInterval(id);
 }

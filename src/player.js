@@ -83,8 +83,8 @@ export function setPlayerModel(p, obj, animations) {
   p.placeholder.visible = false;
   p.model = obj;
   p.root.add(obj);
-  p.anim = bindAnimations(obj, animations, 'walk');
-  if (p.anim) p.anim.action.timeScale = 0.001;
+  p.anim = bindAnimations(obj, animations, 'idle');
+  if (p.anim) setAnimState(p.anim, 'idle');
 }
 
 export async function loadPlayerModel(player, onInfo) {
@@ -186,7 +186,10 @@ export function updatePlayer(p, dt, input, camYaw) {
     p.anim.mixer.update(dt);
     if (moving) setAnimState(p.anim, p.sprinting ? 'run' : 'walk');
     else setAnimState(p.anim, 'idle');
-    if (p.anim.action.timeScale < 0.01) p.anim.action.timeScale = moving ? (p.sprinting ? 1.3 : 1) : 0.85;
+    // Never un-freeze idle by bumping timeScale — only wake for locomotion
+    if (moving && !p.anim.frozenIdle && p.anim.action.timeScale < 0.01) {
+      p.anim.action.timeScale = p.sprinting ? 1.3 : 1;
+    }
   }
 
   p.moving = moving;

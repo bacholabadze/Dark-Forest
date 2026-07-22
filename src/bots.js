@@ -75,15 +75,18 @@ export function createBots(scene) {
       caged: false,
       phase: i * 1.7,
       home: new THREE.Vector3(def.pos[0], 0, def.pos[2]),
-      // Hand-authored plaza loop — never free-nav into buildings
+      // Hand-authored plaza loop — continuous circuit, never hard-stop
       patrol: {
         waypoints: (def.waypoints || [[def.pos[0], def.pos[2]]]).map(
           ([x, z]) => new THREE.Vector3(x, 0, z)
         ),
-        wi: 0,
-        target: new THREE.Vector3(def.pos[0], 0, def.pos[2]),
-        wait: 0.1 + i * 0.2,
-        speed: 2.2 + (i % 3) * 0.4,
+        wi: 1,
+        target: new THREE.Vector3(
+          (def.waypoints?.[1]?.[0] ?? def.pos[0]),
+          0,
+          (def.waypoints?.[1]?.[1] ?? def.pos[2])
+        ),
+        speed: 2.4 + (i % 3) * 0.35,
       },
     };
   });
@@ -113,9 +116,9 @@ export async function loadBotModels(bots, onInfo) {
       b.model = obj;
       b.root.add(obj);
 
-      const prefer = b.def.guilty ? 'idle' : 'walk';
+      const prefer = 'walk';
       b.anim = bindAnimations(obj, gltf.animations, prefer);
-      if (b.anim) b.anim.action.timeScale = b.def.guilty ? 0.001 : 0.6;
+      if (b.anim) b.anim.action.timeScale = 1;
       ok++;
     } catch (e) {
       console.warn(`[bots] ${b.def.id} load failed`, e);
@@ -154,30 +157,24 @@ export function updateBots(bots, dt, t, playerPos) {
       b.root.position.z = next.z;
       b.root.lookAt(playerPos.x, b.root.position.y, playerPos.z);
     } else {
-      // Plaza-only waypoint patrol around Raydium
+      // Continuous closed-loop patrol — never hard-stop mid-path
       const p = b.patrol;
-      if (p.wait > 0) {
-        p.wait -= dt;
-        if (b.anim) setAnimState(b.anim, 'idle');
-        b.root.rotation.y += Math.sin(t * 0.7 + b.phase) * dt * 0.35;
-        if (p.wait <= 0) nextWaypoint(p);
+      const to = new THREE.Vector3().subVectors(p.target, b.root.position);
+      to.y = 0;
+      const dist = to.length();
+      if (dist < 0.55) {
+        nextWaypoint(p);
       } else {
-        const to = new THREE.Vector3().subVectors(p.target, b.root.position);
-        to.y = 0;
-        const dist = to.length();
-        if (dist < 0.4) {
-          p.wait = 1.2 + Math.random() * 2.2;
-          if (b.anim) setAnimState(b.anim, 'idle');
-        } else {
-          to.normalize();
-          b.root.position.addScaledVector(to, p.speed * dt);
-          const heading = Math.atan2(to.x, to.z);
-          let d = heading - b.root.rotation.y;
-          while (d > Math.PI) d -= Math.PI * 2;
-          while (d < -Math.PI) d += Math.PI * 2;
-          b.root.rotation.y += d * Math.min(1, 8 * dt);
-          if (b.anim) setAnimState(b.anim, 'walk');
-        }
+        to.normalize();
+        // Gentle speed variation so the pack doesn't look mechanical
+        const spd = p.speed * (0.92 + 0.08 * Math.sin(t * 0.7 + b.phase));
+        b.root.position.addScaledVector(to, spd * dt);
+        const heading = Math.atan2(to.x, to.z);
+        let d = heading - b.root.rotation.y;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        b.root.rotation.y += d * Math.min(1, 10 * dt);
+        if (b.anim) setAnimState(b.anim, 'walk');
       }
     }
 
