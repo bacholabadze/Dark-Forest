@@ -42,16 +42,16 @@ export function createBots(scene) {
     root.add(beacon);
 
     const column = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.22, 0.22, 60, 8, 1, true),
+      new THREE.CylinderGeometry(0.12, 0.12, 8, 8, 1, true),
       new THREE.MeshBasicMaterial({
         color: def.guilty ? PALETTE.villain : PALETTE.cyan,
         transparent: true,
-        opacity: 0.22,
+        opacity: 0.35,
         side: THREE.DoubleSide,
         depthWrite: false,
       })
     );
-    column.position.y = 28;
+    column.position.y = 5;
     root.add(column);
     root.userData.column = column;
 
@@ -75,6 +75,16 @@ export function createBots(scene) {
       caged: false,
       phase: i * 1.7,
       home: new THREE.Vector3(def.pos[0], 0, def.pos[2]),
+      // Hand-authored plaza loop — never free-nav into buildings
+      patrol: {
+        waypoints: (def.waypoints || [[def.pos[0], def.pos[2]]]).map(
+          ([x, z]) => new THREE.Vector3(x, 0, z)
+        ),
+        wi: 0,
+        target: new THREE.Vector3(def.pos[0], 0, def.pos[2]),
+        wait: 0.1 + i * 0.2,
+        speed: 2.2 + (i % 3) * 0.4,
+      },
     };
   });
 }
@@ -114,6 +124,11 @@ export async function loadBotModels(bots, onInfo) {
   return ok > 0;
 }
 
+function nextWaypoint(p) {
+  p.wi = (p.wi + 1) % p.waypoints.length;
+  p.target.copy(p.waypoints[p.wi]);
+}
+
 export function updateBots(bots, dt, t, playerPos) {
   for (const b of bots) {
     if (b.anim?.mixer) b.anim.mixer.update(dt);
@@ -130,24 +145,47 @@ export function updateBots(bots, dt, t, playerPos) {
       if (away.lengthSq() < 0.001) away.set(1, 0, 0);
       away.normalize();
       const next = b.root.position.clone().addScaledVector(away, 9.2 * dt);
-      if (next.length() > 46) {
-        const tangent = new THREE.Vector3(-next.z, 0, next.x).normalize();
+      // Keep flee inside open plaza ring — no building penetration
+      if (next.length() > 46 || Math.hypot(next.x - 22, next.z + 6) > 18) {
+        const tangent = new THREE.Vector3(-away.z, 0, away.x);
         next.copy(b.root.position).addScaledVector(tangent, 9.2 * dt);
       }
       b.root.position.x = next.x;
       b.root.position.z = next.z;
       b.root.lookAt(playerPos.x, b.root.position.y, playerPos.z);
-    } else if (b.anim) {
-      setAnimState(b.anim, 'idle');
+    } else {
+      // Plaza-only waypoint patrol around Raydium
+      const p = b.patrol;
+      if (p.wait > 0) {
+        p.wait -= dt;
+        if (b.anim) setAnimState(b.anim, 'idle');
+        b.root.rotation.y += Math.sin(t * 0.7 + b.phase) * dt * 0.35;
+        if (p.wait <= 0) nextWaypoint(p);
+      } else {
+        const to = new THREE.Vector3().subVectors(p.target, b.root.position);
+        to.y = 0;
+        const dist = to.length();
+        if (dist < 0.4) {
+          p.wait = 1.2 + Math.random() * 2.2;
+          if (b.anim) setAnimState(b.anim, 'idle');
+        } else {
+          to.normalize();
+          b.root.position.addScaledVector(to, p.speed * dt);
+          const heading = Math.atan2(to.x, to.z);
+          let d = heading - b.root.rotation.y;
+          while (d > Math.PI) d -= Math.PI * 2;
+          while (d < -Math.PI) d += Math.PI * 2;
+          b.root.rotation.y += d * Math.min(1, 8 * dt);
+          if (b.anim) setAnimState(b.anim, 'walk');
+        }
+      }
     }
 
     b.beacon.visible = !b.scanned;
     b.beacon.position.y = 2.8 + Math.sin(t * 3 + b.phase) * 0.12;
     b.beacon.rotation.y += dt * 2;
-    if (b.root.userData.column) {
-      b.root.userData.column.visible = !b.scanned || b.fleeing;
-      b.root.userData.column.material.opacity = b.fleeing ? 0.45 : 0.22;
-    }
+    // No sky-beams — they made the plaza feel like a wall of statues
+    if (b.root.userData.column) b.root.userData.column.visible = false;
   }
 }
 

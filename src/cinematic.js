@@ -52,7 +52,7 @@ export async function descent(rig, onStage, durationA = 6.0, durationB = 6.0) {
   const cam = rig.camera;
 
   onStage?.(0);
-  const orbitC = new THREE.Vector3(0, 0, -10);
+  const orbitC = new THREE.Vector3(10, 0, -20);
   await tween(durationA, (k) => {
     const e = ease(k);
     const ang = -Math.PI * 0.15 + e * Math.PI * 0.55;
@@ -62,20 +62,21 @@ export async function descent(rig, onStage, durationA = 6.0, durationB = 6.0) {
       120 - e * 30,
       orbitC.z + Math.sin(ang) * r
     );
-    cam.lookAt(new THREE.Vector3(0, 18 - e * 8, -14));
+    // Look across sky SOLANA billboard → Raydium plaza
+    cam.lookAt(new THREE.Vector3(12, 48 - e * 20, -40));
     cam.fov = 66 + 8 * Math.sin(e * Math.PI);
     cam.updateProjectionMatrix();
   });
 
   onStage?.(1);
   const from = cam.position.clone();
-  const to = new THREE.Vector3(6, 4.6, 22);
-  const lookFrom = new THREE.Vector3(0, 30, -16);
-  const lookTo = new THREE.Vector3(0, 1.4, 8);
+  const to = new THREE.Vector3(22, 5.2, 22);
+  const lookFrom = new THREE.Vector3(10, 40, -40);
+  const lookTo = new THREE.Vector3(22, 8, -4);
   await tween(durationB, (k) => {
     const e = ease(k);
     cam.position.lerpVectors(from, to, e);
-    const swing = Math.sin(e * Math.PI) * 30 * (1 - e);
+    const swing = Math.sin(e * Math.PI) * 24 * (1 - e);
     cam.position.x += swing;
     cam.position.y += Math.sin(e * Math.PI * 2) * 4 * (1 - e);
     cam.lookAt(new THREE.Vector3().lerpVectors(lookFrom, lookTo, e));

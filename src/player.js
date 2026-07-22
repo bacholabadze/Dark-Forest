@@ -63,7 +63,7 @@ export function createPlayer(scene) {
     model: null,
     anim: null,
     halo,
-    pos: new THREE.Vector3(0, 0, 8),
+    pos: new THREE.Vector3(22, 0, 14),
     vel: new THREE.Vector3(),
     heading: Math.PI,
     grounded: true,

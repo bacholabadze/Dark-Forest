@@ -11,15 +11,17 @@ npm run dev               # http://localhost:8660
 npm run drive             # headless full-loop smoke test
 ```
 
-## Env (optional)
+## Env (optional — copy `.env.example` → `.env`)
 
-```bash
-# .env.local
-VITE_HELIUS_KEY=your-helius-key
-VITE_SOLANA_SECRET=[1,2,3,...]   # funded devnet burner JSON array
-```
+| Var | Purpose | Get it | Demo without? |
+|-----|---------|--------|---------------|
+| `VITE_HELIUS_KEY` | Mainnet **read** — Raydium tx stream | [Helius dashboard](https://dashboard.helius.dev) | Yes — procedural trails |
+| `VITE_SOLANA_SECRET` | Devnet **write** — containment memo | `solana-keygen` + `solana airdrop … --url devnet` | Yes — shows SIMULATED |
+| `VITE_DEVNET_RPC` | Devnet RPC URL | default OK | Yes |
+| `VITE_GEMINI_KEY` | Gemini Flash patrol-log | [Google AI Studio](https://aistudio.google.com/apikey) | Yes — scripted log |
+| `VITE_AI_KEY` | Alias for Gemini key | same | Yes |
 
-Without keys: procedural trails + honest `SIMULATED` containment record.
+Never mainnet write. Never user wallet.
 
 ## Controls
 

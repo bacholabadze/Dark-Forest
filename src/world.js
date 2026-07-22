@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PALETTE, WORLD } from './constants.js';
+import { PALETTE, WORLD, RAYDIUM } from './constants.js';
 
 export const colliders = [];
 
@@ -27,6 +27,190 @@ function addStarfield(scene) {
     depthWrite: false,
   });
   scene.add(new THREE.Points(geo, mat));
+}
+
+function makeSignTexture(title, sub) {
+  const c = document.createElement('canvas');
+  c.width = 2048; c.height = 512;
+  const g = c.getContext('2d');
+  // Keep luminance under bloom threshold (~0.35) so text stays sharp
+  g.fillStyle = '#060a14';
+  g.fillRect(0, 0, 2048, 512);
+  g.strokeStyle = '#1a6a72';
+  g.lineWidth = 14;
+  g.strokeRect(40, 40, 1968, 432);
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.font = 'bold 190px Helvetica, Arial, sans-serif';
+  g.fillStyle = '#b8f0f8';
+  g.fillText(title, 1024, 200);
+  g.font = 'bold 64px Helvetica, Arial, sans-serif';
+  g.fillStyle = '#5ec9a0';
+  g.fillText(sub, 1024, 365);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+/** Sky landmark — logomark + EN "SOLANA". Glow toned ~30% for readability. */
+function makeSkySolanaTexture(logoImg) {
+  const W = 2560, H = 512;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, W, H);
+
+  const text = 'SOLANA';
+  g.font = 'bold 300px Helvetica, Arial, sans-serif';
+  const tw = g.measureText(text).width;
+  const logoH = 268; // ~match text cap height
+  const logoW = logoImg ? (logoImg.naturalWidth / logoImg.naturalHeight) * logoH : 0;
+  const gap = 56;
+  const total = (logoImg ? logoW + gap : 0) + tw;
+  let x = (W - total) / 2;
+
+  if (logoImg) {
+    g.globalAlpha = 0.72;
+    g.drawImage(logoImg, x, (H - logoH) / 2, logoW, logoH);
+    g.globalAlpha = 1;
+    x += logoW + gap;
+  }
+
+  const tx = x + tw / 2;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  // Keep luminance under bloom threshold (~0.35) — readable, not blown-out
+  g.shadowColor = 'rgba(153,69,255,0.18)';
+  g.shadowBlur = 10;
+  g.strokeStyle = 'rgba(20,180,140,0.45)';
+  g.lineWidth = 8;
+  g.strokeText(text, tx, H / 2);
+  g.shadowBlur = 0;
+  g.fillStyle = '#7eb0a8';
+  g.fillText(text, tx, H / 2);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+function addSkySolana(group) {
+  const mat = new THREE.MeshBasicMaterial({
+    map: makeSkySolanaTexture(null),
+    transparent: true,
+    opacity: 0.82,
+    toneMapped: false,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  // Wider plane to fit mark + word
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(112, 22), mat);
+  board.position.set(8, 72, -58);
+  board.rotation.y = Math.PI * 0.08;
+  group.add(board);
+
+  const img = new Image();
+  img.decoding = 'async';
+  img.onload = () => {
+    const old = mat.map;
+    mat.map = makeSkySolanaTexture(img);
+    mat.needsUpdate = true;
+    old?.dispose();
+  };
+  img.src = '/solana-logo.svg';
+  return board;
+}
+
+function buildRaydium(group) {
+  const [x, , z] = RAYDIUM.pos;
+  const [w, h, d] = RAYDIUM.size;
+  const g = new THREE.Group();
+
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({
+      color: 0x1a2848,
+      roughness: 0.35,
+      metalness: 0.75,
+      emissive: 0x142848,
+      emissiveIntensity: 0.8,
+    })
+  );
+  body.position.y = h / 2;
+  body.castShadow = true;
+  body.receiveShadow = true;
+  g.add(body);
+
+  // Neon edge bands
+  for (const y of [4, 10, 16]) {
+    const band = new THREE.Mesh(
+      new THREE.BoxGeometry(w + 0.3, 0.35, d + 0.3),
+      new THREE.MeshBasicMaterial({ color: y === 10 ? PALETTE.solanaB : PALETTE.cyan })
+    );
+    band.position.y = y;
+    g.add(band);
+  }
+
+  const signMat = new THREE.MeshBasicMaterial({
+    map: makeSignTexture('RAYDIUM DEX', 'SOLANA · AMM'),
+    toneMapped: false,
+  });
+  const plateMat = new THREE.MeshBasicMaterial({ color: 0x060a14, toneMapped: false });
+
+  function addSign(w, h, y, zLocal) {
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.35), plateMat);
+    plate.position.set(0, y, zLocal);
+    g.add(plate);
+    const face2 = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.96, h * 0.9), signMat);
+    face2.position.set(0, y, zLocal + Math.sign(zLocal || 1) * 0.22);
+    g.add(face2);
+    const face3 = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.96, h * 0.9), signMat);
+    face3.position.set(0, y, zLocal - Math.sign(zLocal || 1) * 0.22);
+    face3.rotation.y = Math.PI;
+    g.add(face3);
+  }
+
+  addSign(18, 5, 15, d / 2 + 0.4);
+  addSign(18, 5, 15, -(d / 2 + 0.4));
+
+  // Dim roof lamp so bloom doesn't erase the sign text
+  const lamp = new THREE.PointLight(PALETTE.solanaB, 6, 24, 2);
+  lamp.position.set(0, h + 4, 0);
+  g.add(lamp);
+  const gem = new THREE.Mesh(
+    new THREE.OctahedronGeometry(1.4),
+    new THREE.MeshBasicMaterial({ color: PALETTE.solanaB })
+  );
+  gem.position.y = h + 1.2;
+  g.add(gem);
+
+  // Freestanding approach pylon — readable from SCAN spawn
+  const pylon = new THREE.Group();
+  const pole = new THREE.Mesh(
+    new THREE.BoxGeometry(0.7, 11, 0.7),
+    new THREE.MeshBasicMaterial({ color: 0x0a1528, toneMapped: false })
+  );
+  pole.position.y = 5.5;
+  pylon.add(pole);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(12, 3.6, 0.4), plateMat);
+  board.position.set(0, 10, 0);
+  pylon.add(board);
+  const faceA = new THREE.Mesh(new THREE.PlaneGeometry(11.4, 3.2), signMat);
+  faceA.position.set(0, 10, 0.25);
+  pylon.add(faceA);
+  const faceB = new THREE.Mesh(new THREE.PlaneGeometry(11.4, 3.2), signMat);
+  faceB.position.set(0, 10, -0.25);
+  faceB.rotation.y = Math.PI;
+  pylon.add(faceB);
+  pylon.position.set(0, 0, d / 2 + 7);
+  g.add(pylon);
+
+  g.position.set(x, 0, z);
+  group.add(g);
+  addCollider(x, z, w, d, h);
+  return g;
 }
 
 export function buildWorld(scene) {
@@ -79,6 +263,8 @@ export function buildWorld(scene) {
     const ang = (i / 8) * Math.PI * 2 + (i % 3) * 0.28;
     const x = Math.cos(ang) * ring + (rand() - 0.5) * 10;
     const z = Math.sin(ang) * ring + (rand() - 0.5) * 10;
+    // Keep a clear plaza around Raydium DEX
+    if (Math.hypot(x - RAYDIUM.pos[0], z - RAYDIUM.pos[2]) < 22) continue;
     const w = 5 + rand() * 7, d = 5 + rand() * 7, h = 10 + rand() * 30;
 
     m.compose(new THREE.Vector3(x, h / 2, z), q, new THREE.Vector3(w, h, d));
@@ -152,6 +338,9 @@ export function buildWorld(scene) {
   reactor.position.set(-28, 0, -22);
   group.add(reactor);
 
+  const raydium = buildRaydium(group);
+  const skySolana = addSkySolana(group);
+
   scene.add(new THREE.AmbientLight(0x6688cc, 2.0));
   scene.add(new THREE.HemisphereLight(0x8866FF, 0x0a2040, 1.4));
   const key = new THREE.DirectionalLight(0xbfe4ff, 1.8);
@@ -170,7 +359,7 @@ export function buildWorld(scene) {
   fill.position.set(10, 8, 30);
   scene.add(fill);
 
-  return { group, tower, beacon, reactor, rim };
+  return { group, tower, beacon, reactor, rim, raydium, skySolana };
 }
 
 export function createTrails(scene, max = 90) {

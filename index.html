@@ -16,7 +16,8 @@
   <div id="caption" class="caption hidden"></div>
   <div id="smash" class="smash"></div>
   <div id="titlecard" class="titlecard hidden"><div class="tc-lines"></div></div>
-  <div id="skiphint" class="skiphint hidden"></div>
+  <button type="button" id="skipbtn" class="skipbtn hidden"></button>
+  <div id="scenecode" class="scenecode hidden"></div>
 
   <div id="choice" class="overlay choiceoverlay hidden">
     <div class="choicebox">
@@ -31,8 +32,9 @@
 
   <div id="hud" class="hidden">
     <div class="hud-tl">
-      <div class="brand">DARK FOREST <b>BOTS</b> · ELECTRIC</div>
+      <div id="brand-hud" class="brand">DARK FOREST <b>BOTS</b> · ELECTRIC</div>
       <div id="objective" class="objective"></div>
+      <div id="gametip" class="gametip hidden"></div>
     </div>
     <div class="hud-tr">
       <button id="lang" class="chip">EN / ქა</button>
@@ -49,23 +51,24 @@
   </div>
 
   <aside id="strip" class="strip hidden">
-    <div class="strip-hd"><span id="strip-name"></span><i>SCAN COMPLETE</i></div>
+    <div class="strip-hd"><span id="strip-name"></span><i id="strip-done">SCAN COMPLETE</i></div>
     <table>
-      <tr><td>ADDRESS</td><th id="s-addr"></th></tr>
-      <tr><td>ATTACKS</td><th id="s-atk"></th></tr>
-      <tr><td>TOTAL</td><th id="s-tot"></th></tr>
-      <tr><td>FIRST SEEN</td><th id="s-seen"></th></tr>
+      <tr><td id="lab-addr">ADDRESS</td><th id="s-addr"></th></tr>
+      <tr><td id="lab-atk">ATTACKS</td><th id="s-atk"></th></tr>
+      <tr><td id="lab-tot">TOTAL</td><th id="s-tot"></th></tr>
+      <tr><td id="lab-seen">FIRST SEEN</td><th id="s-seen"></th></tr>
     </table>
-    <div class="strip-ft">DARK FOREST BOTS · 2021 REGISTRY</div>
+    <div id="strip-ft" class="strip-ft">DARK FOREST BOTS · 2021 REGISTRY</div>
   </aside>
 
   <div id="sc1" class="overlay hidden">
     <div class="term">
-      <div class="term-hd">SOLANA · SWAP</div>
-      <div class="row"><span>YOU PAY</span><b>2.00 SOL</b></div>
-      <div class="row"><span>YOU RECEIVE</span><b id="sc1-recv">1,000 MOON</b></div>
+      <div id="term-hd" class="term-hd">SOLANA · SWAP</div>
+      <div class="row"><span id="term-pay">YOU PAY</span><b>2.00 SOL</b></div>
+      <div class="row"><span id="term-recv">YOU RECEIVE</span><b id="sc1-recv">1,000 MOON</b></div>
       <button id="sc1-confirm" class="confirm">CONFIRM</button>
       <div id="sc1-alert" class="alert hidden">⚠ SANDWICH DETECTED</div>
+      <p id="sandwich-explain" class="sandwich-explain hidden"></p>
       <div id="sc1-rows" class="txrows"></div>
     </div>
   </div>
@@ -80,12 +83,12 @@
 
   <div id="puzzle" class="overlay hidden">
     <div class="console">
-      <h2>RECONSTRUCT THE ATTACK</h2>
+      <h2 id="puzzle-title">RECONSTRUCT THE ATTACK</h2>
       <p id="puzzle-hint"></p>
       <div class="slots">
-        <div class="slot" data-i="0"><span>FRONT-RUN</span></div>
-        <div class="slot" data-i="1"><span>VICTIM</span></div>
-        <div class="slot" data-i="2"><span>BACK-RUN</span></div>
+        <div class="slot" data-i="0"><span id="slot-front">FRONT-RUN</span></div>
+        <div class="slot" data-i="1"><span id="slot-victim">VICTIM</span></div>
+        <div class="slot" data-i="2"><span id="slot-back">BACK-RUN</span></div>
       </div>
       <div id="tray" class="tray"></div>
       <div id="puzzle-msg" class="msg"></div>
@@ -94,18 +97,18 @@
 
   <div id="record" class="overlay hidden">
     <div class="console rec">
-      <h2>CONTAINMENT RECORD</h2>
+      <h2 id="record-title">CONTAINMENT RECORD</h2>
       <table>
-        <tr><td>CASE</td><th id="r-case"></th></tr>
-        <tr><td>SUBJECT</td><th id="r-subj"></th></tr>
-        <tr><td>RANGER</td><th>#343</th></tr>
-        <tr><td>NETWORK</td><th id="r-net"></th></tr>
-        <tr><td>SIGNATURE</td><th id="r-sig" class="sig"></th></tr>
+        <tr><td id="lab-case">CASE</td><th id="r-case"></th></tr>
+        <tr><td id="lab-subj">SUBJECT</td><th id="r-subj"></th></tr>
+        <tr><td id="lab-ranger">RANGER</td><th>#343</th></tr>
+        <tr><td id="lab-net">NETWORK</td><th id="r-net"></th></tr>
+        <tr><td id="lab-sig">SIGNATURE</td><th id="r-sig" class="sig"></th></tr>
       </table>
       <a id="r-link" class="confirm link hidden" target="_blank" rel="noopener">VIEW ON SOLANA EXPLORER</a>
       <div id="r-note" class="note"></div>
       <div id="r-journal" class="journal hidden">
-        <div class="journal-hd">PATROL LOG · <span id="r-journal-src">SCRIPTED</span></div>
+        <div class="journal-hd"><span id="r-journal-lab">PATROL LOG</span> · <span id="r-journal-src">SCRIPTED</span></div>
         <p id="r-journal-txt"></p>
       </div>
       <button id="r-close" class="confirm ghost">CONTINUE</button>
@@ -119,7 +122,7 @@
       <div class="title">DARK FOREST · <b>BOT #343</b></div>
       <div class="qr-wrap">
         <img id="qr" class="qr" alt="Play QR" width="120" height="120" />
-        <p class="qr-label">SCAN TO PLAY</p>
+        <p id="qr-label" class="qr-label">SCAN TO PLAY</p>
       </div>
       <button id="sc7-again" class="confirm ghost">REPLAY</button>
     </div>
@@ -127,8 +130,8 @@
 
   <div id="loader" class="overlay">
     <div class="loadbox">
-      <div class="brand big">DARK FOREST <b>BOTS</b></div>
-      <div class="sub">ELECTRIC · SEASON 2 · SOLANA</div>
+      <div id="brand-load" class="brand big">DARK FOREST <b>BOTS</b></div>
+      <div id="load-sub" class="sub">ELECTRIC · SEASON 2 · SOLANA</div>
       <div class="bar"><i id="bar"></i></div>
       <div id="loadtxt" class="loadtxt">INITIALISING</div>
       <button id="begin" class="confirm hidden">BEGIN</button>

@@ -1,13 +1,10 @@
-// Scene compositions — the Nolan structure. Each scene is a promise chain of
-// shots + actor moves. The prologue is the ending shown first: the capture
-// echo at the end re-plays its framing, closing the loop.
-
 import * as THREE from 'three';
 import { PALETTE, CASE } from '../constants.js';
 import {
   dolly, dollyTrack, crane, track, freeze, smashCut, titleCard, heartbeat, tween, hold,
 } from './shots.js';
 import { createActor, moveAlong, placeActor } from './actors.js';
+import { setAnimState } from '../assets.js';
 import * as ui from '../ui.js';
 
 function makeTrail(color) {
@@ -19,80 +16,81 @@ function makeTrail(color) {
   return m;
 }
 
-// Test/observability hook — drive.mjs waits on this to screenshot exact beats.
-const beat = (name) => { window.__beat = name; };
+const code = (c) => ui.film.code(c);
 
 export function createFilmScenes({ scene, rig, player, bots, lightning }) {
   const guiltyBot = () => bots.find((b) => b.def.guilty);
   const hero = createActor(player.root, () => player.anim, (p) => player.pos.set(p.x, 0, p.z));
 
-  // ── PROLOGUE — cold open, in medias res (~24s, zero input) ────────────────
-  // All blocking stays inside radius ~12 of the origin: the building rings
-  // start at ~17, so actors and camera never get walled off.
   async function prologue() {
     const g = guiltyBot();
     const villain = createActor(g.root, () => g.anim);
     ui.film.letterbox(true);
 
-    // P1 — black + heartbeat facts (hero waits offscreen, this is the villain's shot)
-    beat('P1');
+    code('P1');
     placeActor(hero, -40, -60, 0);
-    await heartbeat([`SLOT ${CASE.slot}`, '3 TX', '1 VICTIM']);
+    ui.film.caption('capP1');
+    await heartbeat([ui.t('hbFacts', CASE.slot)]);
+    ui.film.caption(null);
 
-    // P2 — ground-level dolly through the open plaza: the guilty bot RUNS
-    // past camera; the camera rail keeps it framed the whole shot.
-    beat('P2');
+    code('P2');
     placeActor(villain, -13, 0, Math.PI / 2);
+    ui.film.caption('capP2');
     await Promise.all([
       moveAlong(villain, [[13, 0, 0]], 6.5, 'run'),
       dollyTrack(rig, [-4, 1.3, 7], [4, 1.3, 7], villain.root, 4.0, 56, 62),
     ]);
+    ui.film.caption(null);
     await smashCut();
 
-    // P3 — crane falling from the tower top, Ranger sprinting below
-    beat('P3');
+    code('P3');
     placeActor(hero, -10, -6, Math.PI / 2);
+    ui.film.caption('capP3');
     await Promise.all([
       moveAlong(hero, [[8, 0, -9]], 5.2, 'run'),
       crane(rig, [2, 44, -26], [5, 5, -15], [0, 1, -8], 3.8, 0.14),
     ]);
+    ui.film.caption(null);
     await smashCut();
 
-    // P4 — behind-Ranger chase cam through the district
-    beat('P4');
+    code('P4');
     placeActor(hero, -8, -2, 0);
+    ui.film.caption('capP4');
     await Promise.all([
       moveAlong(hero, [[-3, 0, 2], [1, 0, 4], [5, 0, 5]], 6.0, 'run'),
       track(rig, player.root, [0, 2.2, -5], 4.2, 80),
     ]);
+    ui.film.caption(null);
 
-    // P5 — FREEZE FRAME one leap from the target, smash to black.
-    // Tableau sits in the open center plaza so no building blocks the lens.
-    beat('P5');
+    // P5 — idle FIRST so freeze is a tableau, not mid-run "running in place"
+    code('P5');
     placeActor(villain, 7, 7, Math.atan2(-2, -2));
+    placeActor(hero, 2.5, 4.5, Math.atan2(4.5, 4.5));
+    if (player.anim) setAnimState(player.anim, 'idle');
+    if (g.anim) setAnimState(g.anim, 'idle');
     rig.manual = true;
     rig.camera.position.set(0, 1.7, 9.5);
     rig.camera.lookAt(6.2, 1.5, 6.2);
     rig.camera.fov = 44;
     rig.camera.updateProjectionMatrix();
     ui.film.caption('capFreeze');
-    await freeze(2.2);
+    await freeze(2.0);
     ui.film.caption(null);
     await smashCut(0.2);
 
-    // P6 — title card: the story rewinds
-    beat('P6');
+    code('P6');
     await titleCard([ui.t('tcName'), ui.t('tc12h')], 2600);
 
-    // reset the stage — the film catches up to this frame later
     placeActor(villain, g.home.x, g.home.z, 0);
     placeActor(hero, 0, 8, Math.PI);
     ui.film.letterbox(false);
+    code(null);
   }
 
-  // ── ACT I — the sandwich dramatized in 3D (terminal watches from a corner)
   async function sandwich() {
+    code('ACT1');
     ui.film.letterbox(true);
+    // Beat 1 — swap starts: you are buying a token
     ui.film.caption('capVictim');
     const green = makeTrail(PALETTE.solanaB);
     const redF = makeTrail(PALETTE.villain);
@@ -108,6 +106,7 @@ export function createFilmScenes({ scene, rig, player, bots, lightning }) {
       const closeK = Math.min(1, Math.max(0, (k - 0.35) / 0.55));
       redF.position.set(gx + 3.4 + (1 - closeK) * 46, 1.2, Z);
       redB.position.set(gx - 3.4 - (1 - closeK) * 38, 1.2, Z);
+      // Beat 2 — red trails close = sandwich
       if (closeK > 0.12 && !bracketShown) {
         bracketShown = true;
         ui.film.caption('capBracket');
@@ -119,7 +118,6 @@ export function createFilmScenes({ scene, rig, player, bots, lightning }) {
       cam.updateProjectionMatrix();
     });
 
-    // the trap springs — the victim trail dims to what actually arrived
     lightning.sandwichFlash();
     await tween(1.3, (k) => {
       green.material.opacity = 0.95 - k * 0.68;
@@ -129,10 +127,11 @@ export function createFilmScenes({ scene, rig, player, bots, lightning }) {
     scene.remove(green, redF, redB);
     ui.film.caption(null);
     ui.film.letterbox(false);
+    code(null);
   }
 
-  // ── ACT II — history montage: three hard cuts with year stamps ────────────
   async function montage() {
+    code('ACT2');
     const cuts = [
       { from: [24, 2.2, 30], to: [19, 2.0, 25], look: [0, 2, 0], cap: 'cap2021' },
       { from: [-14, 2.6, -8], to: [-19, 3.2, -13], look: [-28, 1, -22], cap: 'cap2023' },
@@ -146,11 +145,11 @@ export function createFilmScenes({ scene, rig, player, bots, lightning }) {
     }
     ui.film.caption(null);
     await smashCut(0.14);
+    code(null);
   }
 
-  // ── CHOICE 1 branch — stakeout: hidden camera watches a live attack ───────
   async function stakeout() {
-    beat('STAKEOUT');
+    code('STAKE');
     const g = guiltyBot();
     const villain = createActor(g.root, () => g.anim);
     ui.film.letterbox(true);
@@ -171,7 +170,6 @@ export function createFilmScenes({ scene, rig, player, bots, lightning }) {
     await hold(1.2);
     await moveAlong(villain, [[tx - 2.4, 0, tz - 2.4]], 3.4, 'walk');
 
-    // it brackets the victim live — caught in the act
     const rF = makeTrail(PALETTE.villain);
     const rB = makeTrail(PALETTE.villain);
     rF.position.set(tx + 2.8, 1.0, tz);
@@ -179,18 +177,19 @@ export function createFilmScenes({ scene, rig, player, bots, lightning }) {
     scene.add(rF, rB);
     lightning.sandwichFlash();
     ui.film.caption('capCaught');
-    beat('CAUGHT');
+    code('CAUGHT');
+    if (g.anim) setAnimState(g.anim, 'idle');
     await freeze(1.5);
 
-    // it knows it was seen — flees back into the forest
     await moveAlong(villain, [[g.home.x, 0, g.home.z]], 9.5, 'run');
     scene.remove(victim, rF, rB);
     ui.film.caption(null);
     ui.film.letterbox(false);
+    code(null);
   }
 
-  // ── CAPTURE ECHO — the prologue framing repeats, loop closes ──────────────
   async function captureEcho(cagePos) {
+    code('ECHO');
     ui.film.letterbox(true);
     ui.film.caption('capLoop');
     rig.manual = true;
@@ -206,11 +205,11 @@ export function createFilmScenes({ scene, rig, player, bots, lightning }) {
     ui.film.caption(null);
     await smashCut(0.18);
     ui.film.letterbox(false);
+    code(null);
   }
 
-  // ── ENDING A — tribunal: the vault takes its 343rd ────────────────────────
   async function tribunal(cage) {
-    beat('TRIBUNAL');
+    code('TRIB');
     const g = guiltyBot();
     ui.film.letterbox(true);
     ui.film.caption('capTribunal');
@@ -228,21 +227,19 @@ export function createFilmScenes({ scene, rig, player, bots, lightning }) {
     ui.film.caption(null);
     await ui.endingArchive();
     ui.film.letterbox(false);
+    code(null);
   }
 
-  // ── ENDING B — rehabilitate: bot #344, second defender ────────────────────
   async function rehabilitate(cage) {
-    beat('REHAB');
+    code('REHAB');
     const g = guiltyBot();
     ui.film.letterbox(true);
     rig.manual = true;
     const p = g.root.position;
 
-    // the cage opens
     await tween(1.8, (k) => cage.scale.setScalar(Math.max(0.01, 1 - k)));
     scene.remove(cage);
 
-    // villain red burns down to defender cyan
     (g.model || g.placeholder).traverse((n) => {
       if (!n.isMesh || !n.material) return;
       const mats = Array.isArray(n.material) ? n.material : [n.material];
@@ -263,6 +260,7 @@ export function createFilmScenes({ scene, rig, player, bots, lightning }) {
     });
     ui.film.caption(null);
     ui.film.letterbox(false);
+    code(null);
   }
 
   return { prologue, sandwich, montage, stakeout, captureEcho, tribunal, rehabilitate };

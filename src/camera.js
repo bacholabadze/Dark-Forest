@@ -10,6 +10,8 @@ export function createCameraRig(camera) {
     dist: CAM.DIST,
     target: new THREE.Vector3(),
     manual: false,
+    /** While > 0, mouse free-look wins over WASD follow. */
+    lookHold: 0,
   };
 }
 
@@ -35,8 +37,31 @@ function clampAgainstBuildings(origin, dir, maxDist) {
   return Math.max(CAM.MIN, best);
 }
 
-export function updateCamera(rig, dt, playerPos, sprinting) {
+function shortestDelta(from, to) {
+  let d = to - from;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+
+/**
+ * PlayStation-style 3rd person:
+ * - WASD moves relative to camera (unchanged in player.js)
+ * - While moving (and not mouse-looking), camera yaw follows behind the face
+ * - Mouse drag = temporary free look; after LOOK_HOLD, follow resumes on move
+ */
+export function updateCamera(rig, dt, playerPos, sprinting, heading = 0, moving = false) {
   if (rig.manual) return;
+
+  if (rig.lookHold > 0) rig.lookHold = Math.max(0, rig.lookHold - dt);
+
+  if (moving && rig.lookHold <= 0) {
+    // Sit behind the character: yaw = heading + π
+    const want = heading + Math.PI;
+    rig.yaw += shortestDelta(rig.yaw, want) * Math.min(1, CAM.FOLLOW * dt);
+    // Soft-reset pitch toward default while following
+    rig.pitch += (0.30 - rig.pitch) * Math.min(1, 3 * dt);
+  }
 
   rig.target.lerp(
     new THREE.Vector3(playerPos.x, playerPos.y + CAM.HEIGHT, playerPos.z),

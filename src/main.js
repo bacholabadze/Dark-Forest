@@ -38,7 +38,7 @@ const camera = new THREE.PerspectiveCamera(MOVE.FOV, innerWidth / innerHeight, 0
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 // Electric Forest bloom — hotter, lower threshold for lightning glow
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.2, 0.55, 0.35);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.05, 0.5, 0.48);
 composer.addPass(bloom);
 composer.addPass(new SMAAPass());
 
@@ -69,7 +69,7 @@ addEventListener('keydown', (e) => {
     if (k === 'KeyE') interactPressed = true;
     if (k === 'Space') containPressed = true;
   }
-  // ENTER fast-forwards the current film scene — the stage demo stays in control
+  // ENTER or Skip button fast-forwards the current film scene
   if (k === 'Enter' && filmState.active) requestSkip();
   keys.add(k);
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) e.preventDefault();
@@ -90,6 +90,7 @@ addEventListener('pointermove', (e) => {
   if (!dragging) return;
   rig.yaw -= (e.clientX - lastX) * 0.005;
   rig.pitch = Math.max(-0.15, Math.min(1.05, rig.pitch + (e.clientY - lastY) * 0.004));
+  rig.lookHold = 0.85; // mouse look pauses WASD follow briefly
   lastX = e.clientX; lastY = e.clientY;
 });
 canvas.addEventListener('wheel', (e) => {
@@ -106,14 +107,18 @@ let scanned = 0;
 const guilty = () => bots.find((b) => b.def.guilty);
 
 function refreshLang() {
+  ui.applyLabels();
   ui.hud.keys();
   ui.hud.scanned(scanned);
   ui.hud.live(chainState.streamLive);
   ui.hud.txCount?.(chainState.txCount);
-  if (ctx.state === STATE.SCAN) ui.hud.objective(ui.t('objScan'));
-  if (ctx.state === STATE.PUZZLE) ui.hud.objective(ui.t('objPuzzle'));
-  if (ctx.state === STATE.CHASE) ui.hud.objective(ui.t('objChase'));
-  if (ctx.state === STATE.DONE) ui.hud.objective(ui.t('objDone'));
+  if (ctx.state === STATE.SCAN) {
+    ui.hud.objective(ui.t('objScan'));
+    ui.hud.tip(ui.t('tipScan'));
+  }
+  if (ctx.state === STATE.PUZZLE) { ui.hud.objective(ui.t('objPuzzle')); ui.hud.tip(null); }
+  if (ctx.state === STATE.CHASE) { ui.hud.objective(ui.t('objChase')); ui.hud.tip(null); }
+  if (ctx.state === STATE.DONE) { ui.hud.objective(ui.t('objDone')); ui.hud.tip(null); }
 }
 ui.initLang(refreshLang);
 
@@ -178,32 +183,41 @@ async function runStory() {
     // GAMEPLAY — scan the district
     { type: 'game', state: STATE.SCAN, until: STATE.PUZZLE, onEnter: () => {
       rig.manual = false;
+      // Face Raydium plaza — camera sits behind the ranger looking at the DEX
+      player.pos.set(22, 0, 14);
+      player.heading = Math.PI; // face -Z toward Raydium front
+      player.root.position.copy(player.pos);
+      player.root.rotation.y = player.heading;
+      rig.yaw = player.heading + Math.PI;
+      rig.pitch = 0.14;
       ui.hud.show();
+      ui.film.code('SCAN');
       lightning.setActive(false);
       refreshLang();
+      setTimeout(() => ui.hud.tip(null), 14000);
     } },
 
-    // The console reconstruction
     { type: 'film', fn: async () => {
+      ui.film.code('PUZZLE');
       await hold(1.2);
       await ui.openPuzzle();
     } },
 
-    // CHOICE 1 — how do we take it
     { type: 'choice', id: 'approach', prompt: 'choiceApproach', recommended: 0, options: [
       { id: 'stakeout', label: 'optStakeout' },
       { id: 'pursuit', label: 'optPursuit' },
     ] },
     { type: 'film', fn: async (c) => {
+      ui.film.code('CH1');
       if (c.choices.approach === 'stakeout') await film.stakeout();
       else await punchIn(rig, guilty().root.position);
       guilty().fleeing = true;
       lightning.setActive(true);
     } },
 
-    // GAMEPLAY — the chase, ends when SPACE contains the guilty bot
     { type: 'game', state: STATE.CHASE, until: STATE.DONE, onEnter: () => {
       rig.manual = false;
+      ui.film.code('CHASE');
       refreshLang();
     } },
 
@@ -264,7 +278,7 @@ function frame() {
     updatePlayer(player, dt, input, rig.yaw);
     updateBots(bots, dt, t, player.pos);
   }
-  updateCamera(rig, dt, player.pos, player.sprinting);
+    updateCamera(rig, dt, player.pos, player.sprinting, player.heading, player.moving);
   trails.update(dt);
   lightning.update(dt);
 
@@ -321,7 +335,39 @@ window.__test = {
     player.pos.set(g.root.position.x + 2.0, 0, g.root.position.z + 2.0);
     player.root.position.copy(player.pos);
   },
+  /** Jump to SCAN plaza facing Raydium (smoke / rehearsal). */
+  skipToScan() {
+    requestSkip();
+    player.frozen = false;
+    player.pos.set(22, 0, 14);
+    player.heading = Math.PI;
+    player.root.position.copy(player.pos);
+    player.root.rotation.y = player.heading;
+    rig.manual = false;
+    rig.yaw = player.heading + Math.PI;
+    rig.pitch = 0.22;
+    ctx.state = STATE.SCAN;
+    ui.hud.show();
+    ui.film.code('SCAN');
+    ui.film.letterbox(false);
+    ui.film.caption(null);
+    // Hide film overlays that might still be up
+    document.getElementById('sc1')?.classList.add('hidden');
+    document.getElementById('sc2')?.classList.add('hidden');
+    document.getElementById('titlecard')?.classList.add('hidden');
+    lightning.setActive(false);
+    refreshLang();
+    return 'SCAN @ Raydium plaza';
+  },
   skip() { requestSkip(); },
+  aerialSky() {
+    rig.manual = true;
+    camera.position.set(22, 95, 40);
+    camera.lookAt(8, 72, -58);
+    camera.fov = 55;
+    camera.updateProjectionMatrix();
+    return 'aerial → SOLANA sky';
+  },
   choose(which) {
     document.getElementById(which === 'b' ? 'choice-b' : 'choice-a')?.click();
   },
@@ -344,25 +390,30 @@ window.__test = {
 
 // ── boot ────────────────────────────────────────────────────────────────────
 (async function boot() {
-  ui.loader.progress(0.15, 'BUILDING ELECTRIC DISTRICT');
+  // Skip button — same path as ENTER
+  document.getElementById('skipbtn')?.addEventListener('click', () => {
+    if (filmState.active) requestSkip();
+  });
+
+  ui.loader.progress(0.15, 'load1');
   frame();
 
-  ui.loader.progress(0.4, 'OPENING TRANSACTION STREAM');
+  ui.loader.progress(0.4, 'load2');
   startTransactionStream(() => trails.spawn());
   setInterval(() => {
     ui.hud.live(chainState.streamLive);
     ui.hud.txCount?.(chainState.txCount);
   }, 1000);
 
-  ui.loader.progress(0.55, 'LOADING RANGER ONE');
+  ui.loader.progress(0.55, 'load3');
   await loadPlayerModel(player);
 
-  ui.loader.progress(0.75, 'GENERATING SUSPECTS');
+  ui.loader.progress(0.75, 'load4');
   loadBotModels(bots, ({ tris, id }) => {
     console.info(`[bots] ${id} — ${tris.toLocaleString()} triangles`);
     if (tris > 60000) console.warn('[bots] OVER BUDGET — remesh before demo');
   }).then((ok) => console.info(ok ? '[bots] models swapped in' : '[bots] running on placeholders'));
 
-  ui.loader.progress(1, 'READY');
+  ui.loader.progress(1, 'load5');
   ui.loader.ready(() => runStory());
 })();

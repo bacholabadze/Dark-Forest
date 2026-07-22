@@ -32,11 +32,19 @@ export const CAM = {
   MAX: 16,
   HEIGHT: 2.6,
   LERP: 9,
+  FOLLOW: 6.5,       // how fast yaw catches character facing
+  LOOK_HOLD: 0.85,   // seconds mouse look overrides follow
 };
 
 export const WORLD = {
   SIZE: 150,
   BLOCKS: 26,
+};
+
+/** Landmark — sandwich hunting ground. Bots patrol around this. */
+export const RAYDIUM = {
+  pos: [22, 0, -6],
+  size: [14, 22, 10],
 };
 
 export const MODELS = {
@@ -72,7 +80,9 @@ export const BOTS = [
     firstSeen: 2021,
     guilty: true,
     modelKey: 'guilty',
-    pos: [16, 0, -12],
+    // Closest to Raydium entrance — plaza waypoints only (open ground)
+    pos: [16, 0, -2],
+    waypoints: [[16, -2], [12, 4], [18, 10], [14, 6], [16, -2]],
   },
   {
     id: 'bot-a',
@@ -84,7 +94,8 @@ export const BOTS = [
     firstSeen: 2021,
     guilty: false,
     modelKey: 'botA',
-    pos: [-19, 0, 6],
+    pos: [30, 0, 4],
+    waypoints: [[30, 4], [34, 8], [28, 12], [32, 2], [30, 4]],
   },
   {
     id: 'bot-b',
@@ -96,7 +107,8 @@ export const BOTS = [
     firstSeen: 2022,
     guilty: false,
     modelKey: 'botB',
-    pos: [2, 0, 22],
+    pos: [22, 0, 8],
+    waypoints: [[22, 8], [26, 11], [18, 12], [20, 6], [22, 8]],
   },
 ];
 

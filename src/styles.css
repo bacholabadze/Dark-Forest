@@ -182,9 +182,20 @@ button{font:inherit;cursor:pointer}
   letter-spacing:.3em;color:var(--red);animation:hbpulse 1.1s infinite}
 @keyframes hbpulse{50%{opacity:.45}}
 
-/* skip hint */
-.skiphint{position:absolute;right:22px;bottom:calc(11vh + 14px);z-index:6;
-  font-size:9px;letter-spacing:.2em;color:#6A82B8;pointer-events:none}
+/* skip — real clickable button for stage demos */
+.skipbtn{position:absolute;right:18px;bottom:calc(11vh + 12px);z-index:9;
+  pointer-events:auto;background:rgba(11,16,38,.88);border:1px solid var(--cyan);
+  color:#fff;font-family:var(--mono);font-size:11px;letter-spacing:.14em;
+  padding:10px 14px;border-radius:4px;cursor:pointer;
+  box-shadow:0 0 20px rgba(0,240,255,.2)}
+.skipbtn b{color:var(--cyan)}
+.skipbtn:hover{filter:brightness(1.15);transform:translateY(-1px)}
+.scenecode{position:absolute;left:18px;bottom:calc(11vh + 14px);z-index:6;
+  font-size:10px;letter-spacing:.22em;color:#6A82B8;pointer-events:none;
+  border:1px solid var(--line);padding:4px 8px;border-radius:3px;background:rgba(11,16,38,.7)}
+.gametip{margin-top:8px;font-size:11px;letter-spacing:.06em;color:var(--dim);
+  max-width:min(52ch,70vw);line-height:1.45;border-left:2px solid var(--magenta);padding-left:10px}
+.sandwich-explain{margin-top:12px;font-size:11px;color:var(--dim);line-height:1.55;letter-spacing:.04em}
 
 /* choice point — two doors, one countdown */
 .choiceoverlay{background:radial-gradient(circle at 50% 45%,rgba(26,10,62,.55),rgba(11,16,38,.9))}

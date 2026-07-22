@@ -21,9 +21,9 @@ function setClip(actor, prefer) {
   const anim = actor.anim();
   if (!anim) return;
   setAnimState(anim, prefer);
-  // Player rigs boot with timeScale 0.001 (frozen pose) — wake the clip up.
-  if (anim.action.timeScale < 0.01) {
-    anim.action.timeScale = prefer === 'run' ? 1.35 : prefer === 'idle' ? 0.85 : 1;
+  // Player rigs boot with timeScale 0.001 — wake only for locomotion clips.
+  if (prefer !== 'idle' && anim.action && !anim.frozenIdle && anim.action.timeScale < 0.01) {
+    anim.action.timeScale = prefer === 'run' ? 1.35 : 1;
   }
 }
 
@@ -59,7 +59,12 @@ export function moveAlong(actor, points, speed = 7, clip = 'walk') {
         actor.root.position.z = end.z;
         return finish();
       }
-      if (filmState.paused) return requestAnimationFrame(tick);
+      // World freeze (P5 / CAUGHT): hold pose — never keep a run loop going
+      // while the root is parked, or it reads as "running in place".
+      if (filmState.paused) {
+        setClip(actor, 'idle');
+        return requestAnimationFrame(tick);
+      }
 
       const target = path[seg];
       const pos = actor.root.position;
@@ -72,7 +77,9 @@ export function moveAlong(actor, points, speed = 7, clip = 'walk') {
         pos.x = target.x; pos.z = target.z;
         seg++;
         if (seg >= path.length) return finish();
+        setClip(actor, clip); // resume locomotion after a brief waypoint snap
       } else {
+        setClip(actor, clip);
         to.normalize();
         pos.addScaledVector(to, step);
         const heading = Math.atan2(to.x, to.z);
