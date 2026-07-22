@@ -11,24 +11,34 @@
 
 const AI_KEY = import.meta.env.VITE_AI_KEY || '';
 
-const SCRIPTED = [
-  (c) => `Subject ${c.subject} bracketed a ${c.expected} ${c.token} swap in slot ${c.slot} — bought ahead, sold behind, walked away with the spread. Victim received ${c.received}. Contained by Ranger #343.`,
-  (c) => `Case #${c.caseId}: the same wallet appears before and after the victim in slot ${c.slot}. That symmetry is the signature of a sandwich. Subject ${c.subject} is now in the cage.`,
-  (c) => `The victim asked for ${c.expected} ${c.token} and got ${c.received}. The difference did not vanish — it moved to ${c.subject}. Tonight it moved back into the record. Contained.`,
-];
+const SCRIPTED = {
+  en: [
+    (c) => `Subject ${c.subject} bracketed a ${c.expected} ${c.token} swap in slot ${c.slot} — bought ahead, sold behind, walked away with the spread. Victim received ${c.received}. Contained by Ranger #343.`,
+    (c) => `Case #${c.caseId}: the same wallet appears before and after the victim in slot ${c.slot}. That symmetry is the signature of a sandwich. Subject ${c.subject} is now in the cage.`,
+    (c) => `The victim asked for ${c.expected} ${c.token} and got ${c.received}. The difference did not vanish — it moved to ${c.subject}. Tonight it moved back into the record. Contained.`,
+  ],
+  ka: [
+    (c) => `ობიექტმა ${c.subject} სლოტში ${c.slot} ${c.expected} ${c.token} გაცვლა ორივე მხრიდან ჩაკეტა — წინ იყიდა, უკან გაყიდა და სხვაობა წაიღო. მსხვერპლმა მიიღო ${c.received}. იზოლირებულია რეინჯერ #343-ის მიერ.`,
+    (c) => `საქმე #${c.caseId}: ერთი და იგივე საფულე ჩნდება მსხვერპლის წინაც და შემდეგაც სლოტში ${c.slot}. ეს სიმეტრია სენდვიჩის ხელწერაა. ობიექტი ${c.subject} უკვე გალიაშია.`,
+    (c) => `მსხვერპლი ითხოვდა ${c.expected} ${c.token}-ს და მიიღო ${c.received}. სხვაობა არ გამქრალა — ის ${c.subject}-სთან გადავიდა. ამაღამ ის ჩანაწერს დაუბრუნდა. იზოლირებულია.`,
+  ],
+};
 
-let scriptedIdx = Math.floor(Math.random() * SCRIPTED.length);
+let scriptedIdx = Math.floor(Math.random() * SCRIPTED.en.length);
 
 export const aiState = { live: !!AI_KEY };
 
 /**
  * Narrate a containment. Never throws, never stalls the demo:
  * 4s timeout, then the scripted corpus answers.
+ * `lang` comes from the caller — importing it from ui.js would create a
+ * ui → ai → ui import cycle.
  */
-export async function narrateCase(caseData) {
+export async function narrateCase(caseData, lang = 'en') {
+  const corpus = SCRIPTED[lang] || SCRIPTED.en;
   const fallback = () => {
-    scriptedIdx = (scriptedIdx + 1) % SCRIPTED.length;
-    return { text: SCRIPTED[scriptedIdx](caseData), live: false };
+    scriptedIdx = (scriptedIdx + 1) % corpus.length;
+    return { text: corpus[scriptedIdx](caseData), live: false };
   };
 
   if (!AI_KEY) return fallback();
@@ -48,7 +58,8 @@ export async function narrateCase(caseData) {
       body: JSON.stringify({
         model: 'claude-3-5-haiku-latest',
         max_tokens: 120,
-        system: 'You are Ranger One, bot #343 — the first Dark Forest bot defending users instead of extracting from them. Write a terse 2-sentence patrol-log entry about a contained sandwich attack. Facts only from the JSON. No emojis, no hype, radio-report tone.',
+        system: 'You are Ranger One, bot #343 — the first Dark Forest bot defending users instead of extracting from them. Write a terse 2-sentence patrol-log entry about a contained sandwich attack. Facts only from the JSON. No emojis, no hype, radio-report tone.'
+          + (lang === 'ka' ? ' Write the entry in Georgian.' : ''),
         messages: [{ role: 'user', content: JSON.stringify(caseData) }],
       }),
     });

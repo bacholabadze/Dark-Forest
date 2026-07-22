@@ -7,7 +7,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 
-import { PALETTE, MOVE, CASE, STATE } from './constants.js';
+import { PALETTE, MOVE, CAM, CASE, STATE } from './constants.js';
 import { buildWorld, createTrails } from './world.js';
 import { createPlayer, updatePlayer, loadPlayerModel } from './player.js';
 import { createCameraRig, updateCamera } from './camera.js';
@@ -16,6 +16,7 @@ import { startTransactionStream, recordContainment, chainState } from './chain.j
 import { narrateCase } from './ai.js';
 import { descent, ascent, punchIn, reveal } from './cinematic.js';
 import { createLightning } from './lightning.js';
+import { createBolts, createImpact } from './projectile.js';
 import { runTimeline } from './director.js';
 import * as ui from './ui.js';
 
@@ -27,16 +28,20 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = 1.30;
 renderer.info.autoReset = false;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(MOVE.FOV, innerWidth / innerHeight, 0.1, 500);
+// far=700: the horizon moon at (0,78,-400) is ~536 units from the far end of
+// the descent orbit — 500 clipped it mid-shot. near=0.3 buys the precision
+// back (the camera can never get closer than CAM.MIN=4.2).
+const camera = new THREE.PerspectiveCamera(MOVE.FOV, innerWidth / innerHeight, 0.3, 700);
 
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-// Electric Forest bloom — hotter, lower threshold for lightning glow
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.2, 0.55, 0.35);
+// Electric Forest bloom — threshold raised with exposure so the brighter
+// base doesn't turn milky and the neon still pops
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.05, 0.6, 0.50);
 composer.addPass(bloom);
 composer.addPass(new SMAAPass());
 
@@ -51,6 +56,7 @@ addEventListener('resize', () => {
 const world = buildWorld(scene);
 const trails = createTrails(scene);
 const lightning = createLightning(scene);
+const bolts = createBolts(scene);
 const player = createPlayer(scene);
 const rig = createCameraRig(camera);
 let bots = createBots(scene);
@@ -59,13 +65,13 @@ let cage = null;
 // ── input ───────────────────────────────────────────────────────────────────
 const keys = new Set();
 const input = { x: 0, z: 0, sprint: false, jump: false };
-let interactPressed = false, containPressed = false;
+let interactPressed = false, firePressed = false;
 
 addEventListener('keydown', (e) => {
   const k = e.code;
   if (!keys.has(k)) {
     if (k === 'KeyE') interactPressed = true;
-    if (k === 'Space') containPressed = true;
+    if (k === 'KeyF') firePressed = true;
   }
   keys.add(k);
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) e.preventDefault();
@@ -80,13 +86,17 @@ function readInput() {
 }
 
 let dragging = false, lastX = 0, lastY = 0;
-canvas.addEventListener('pointerdown', (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+canvas.addEventListener('pointerdown', (e) => {
+  dragging = true; lastX = e.clientX; lastY = e.clientY;
+  rig.lookHold = CAM.FOLLOW_RESUME;
+});
 addEventListener('pointerup', () => { dragging = false; });
 addEventListener('pointermove', (e) => {
   if (!dragging) return;
   rig.yaw -= (e.clientX - lastX) * 0.005;
   rig.pitch = Math.max(-0.15, Math.min(1.05, rig.pitch + (e.clientY - lastY) * 0.004));
   lastX = e.clientX; lastY = e.clientY;
+  rig.lookHold = CAM.FOLLOW_RESUME;
 });
 canvas.addEventListener('wheel', (e) => {
   rig.dist = Math.max(5, Math.min(16, rig.dist + e.deltaY * 0.01));
@@ -138,6 +148,34 @@ async function onScan(bot) {
   }
 }
 
+// ── containment bolt ────────────────────────────────────────────────────────
+const FIRE_COOLDOWN = 0.35;
+let fireCooldown = 0;
+
+function boltMuzzleAndDir() {
+  const fwd = new THREE.Vector3(-Math.sin(rig.yaw), 0, -Math.cos(rig.yaw));
+  const origin = player.pos.clone().add(new THREE.Vector3(0, 1.5, 0)).addScaledVector(fwd, 0.8);
+  return { origin, dir: fwd };
+}
+
+function fireBolt(dirOverride = null) {
+  if (fireCooldown > 0 || player.frozen) return;
+  const { origin, dir } = boltMuzzleAndDir();
+  const g = guilty();
+  const assist = g && !g.caged ? g.root.position.clone().setY(1.0) : null;
+  bolts.fire(origin, dirOverride || dir, dirOverride ? null : assist);
+  fireCooldown = FIRE_COOLDOWN;
+}
+
+function onBoltHit(bot, point) {
+  if (bot.def.guilty) {
+    onContain(bot);
+  } else {
+    createImpact(scene, point, PALETTE.cyan);
+    ui.hud.notice(ui.t('noMatch'), 2200);
+  }
+}
+
 async function onContain(bot) {
   if (ctx.state !== STATE.CHASE || !bot.def.guilty) return;
   ctx.state = STATE.DONE;
@@ -153,7 +191,7 @@ async function onContain(bot) {
   const narration = narrateCase({
     caseId: CASE.id, subject: bot.def.short, slot: CASE.slot,
     token: CASE.victimToken, expected: CASE.expected, received: CASE.received,
-  });
+  }, ui.getLang());
   let result;
   try {
     result = await recordContainment({ caseId: CASE.id, subject: bot.def.short });
@@ -204,13 +242,20 @@ function frame() {
 
   readInput();
   updatePlayer(player, dt, input, rig.yaw);
-  updateCamera(rig, dt, player.pos, player.sprinting);
+  updateCamera(rig, dt, player, input);
   updateBots(bots, dt, t, player.pos);
   trails.update(dt);
+  bolts.update(dt, bots, onBoltHit);
   lightning.update(dt);
+  fireCooldown = Math.max(0, fireCooldown - dt);
 
   world.beacon.rotation.y += dt * 0.8;
   world.beacon.position.y = 48 + Math.sin(t * 0.9) * 0.6;
+  world.moon.halo.material.opacity = 0.75 + Math.sin(t * 0.7) * 0.15;
+
+  // Raydium hologram: drifting scanlines + breathing opacity with rare dropouts.
+  world.hq.holoMat.map.offset.y = (t * 0.15) % 1;
+  world.hq.holoMat.opacity = 0.62 + Math.sin(t * 3.1) * 0.06 - (Math.random() < 0.02 ? 0.35 : 0);
   if (cage) {
     cage.scale.lerp(new THREE.Vector3(1, 1, 1), Math.min(1, 6 * dt));
     for (let i = 0; i < 3; i++) cage.userData[`r${i}`].rotation.z += dt * (0.6 + i * 0.4);
@@ -223,13 +268,13 @@ function frame() {
   } else if (ctx.state === STATE.CHASE) {
     const g = guilty();
     const d = g.root.position.distanceTo(player.pos);
-    ui.hud.prompt(d < 5.2 ? ui.t('pressSpace') : null);
-    if (containPressed && d < 5.2) onContain(g);
+    ui.hud.prompt(d < 40 ? ui.t('pressF') : null);
+    if (firePressed) fireBolt();
   } else {
     ui.hud.prompt(null);
   }
   interactPressed = false;
-  containPressed = false;
+  firePressed = false;
 
   acc += dt; frames++;
   if (acc >= 0.5) {
@@ -248,7 +293,17 @@ window.__test = {
   state: () => Object.keys(STATE).find((k) => STATE[k] === ctx.state) || '?',
   press(code) {
     if (code === 'KeyE') interactPressed = true;
-    if (code === 'Space') containPressed = true;
+    if (code === 'KeyF') firePressed = true;
+  },
+  fire() {
+    // Deterministic — aims straight at the guilty bot, no camera yaw needed.
+    const g = guilty();
+    if (!g) return 'no guilty bot';
+    const { origin } = boltMuzzleAndDir();
+    const dir = g.root.position.clone().setY(1.0).sub(origin).normalize();
+    fireCooldown = 0;
+    fireBolt(dir);
+    return 'fired';
   },
   gotoBot(i) {
     const b = bots[i];
@@ -278,28 +333,27 @@ window.__test = {
 
 // ── boot ────────────────────────────────────────────────────────────────────
 (async function boot() {
-  ui.loader.progress(0.15, 'BUILDING ELECTRIC DISTRICT');
+  ui.loader.progress(0.15, ui.t('load1'));
   frame();
 
-  ui.loader.progress(0.4, 'OPENING TRANSACTION STREAM');
+  ui.loader.progress(0.4, ui.t('load2'));
   startTransactionStream(() => trails.spawn());
   setInterval(() => {
     ui.hud.live(chainState.streamLive);
     ui.hud.txCount?.(chainState.txCount);
   }, 1000);
 
-  ui.loader.progress(0.55, 'LOADING RANGER ONE');
+  ui.loader.progress(0.55, ui.t('load3'));
   await loadPlayerModel(player);
 
-  ui.loader.progress(0.75, 'GENERATING SUSPECTS');
+  ui.loader.progress(0.75, ui.t('load4'));
   loadBotModels(bots, ({ tris, id }) => {
     console.info(`[bots] ${id} — ${tris.toLocaleString()} triangles`);
     if (tris > 60000) console.warn('[bots] OVER BUDGET — remesh before demo');
   }).then((ok) => console.info(ok ? '[bots] models swapped in' : '[bots] running on placeholders'));
 
-  ui.loader.progress(1, 'READY');
+  ui.loader.progress(1, ui.t('load5'));
   ui.loader.ready(() => runIntro());
 })();
 
 void runTimeline;
-void PALETTE;

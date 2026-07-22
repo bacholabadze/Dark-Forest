@@ -6,7 +6,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const meshyRoot = join(root, '..', 'Meshy Assets', 'wetransfer_meshy_ai_cybernetic_sentinel_biped_2026-07-22_1214');
+// Drop your Meshy character folders into assets-src/ (gitignored) — see README.
+const meshyRoot = join(root, 'assets-src');
 const outDir = join(root, 'public', 'models');
 
 // Ranger uses the Hex Grid rig because that character ships BOTH Walking and
@@ -14,10 +15,16 @@ const outDir = join(root, 'public', 'models');
 const MAP = [
   ['Meshy_AI_Hex_Grid_Sentinel_biped/Meshy_AI_Hex_Grid_Sentinel_biped_Animation_Walking_withSkin.glb', 'ranger-one.glb'],
   ['Meshy_AI_Hex_Grid_Sentinel_biped/Meshy_AI_Hex_Grid_Sentinel_biped_Animation_Running_withSkin.glb', 'ranger-run.glb'],
-  ['Meshy_AI_Cybernetic_Sentinel_biped/Meshy_AI_Cybernetic_Sentinel_biped_Animation_Walking_withSkin.glb', 'bot-guilty.glb'],
+  ['Meshy_AI_Hexagon_Sentinel_biped/Meshy_AI_Hexagon_Sentinel_biped_Animation_Walking_withSkin.glb', 'bot-guilty.glb'],
   ['Meshy_AI_Hex_Grid_Sentinel_biped 2/Meshy_AI_Hex_Grid_Sentinel_biped_Animation_Walking_withSkin.glb', 'bot-a.glb'],
-  ['Meshy_AI_Hexagon_Sentinel_biped/Meshy_AI_Hexagon_Sentinel_biped_Animation_Walking_withSkin.glb', 'bot-b.glb'],
+  ['Meshy_AI_Cybernetic_Sentinel_biped/Meshy_AI_Cybernetic_Sentinel_biped_Animation_Walking_withSkin.glb', 'bot-b.glb'],
 ];
+
+if (!existsSync(meshyRoot)) {
+  console.error(`ERROR: source folder not found: ${meshyRoot}`);
+  console.error('Create assets-src/ in the repo root and drop your Meshy character folders there.');
+  process.exit(1);
+}
 
 mkdirSync(outDir, { recursive: true });
 
@@ -25,11 +32,14 @@ function mb(path) {
   return (statSync(path).size / (1024 * 1024)).toFixed(1);
 }
 
+let missing = 0;
+
 for (const [srcRel, destName] of MAP) {
   const src = join(meshyRoot, srcRel);
   const dest = join(outDir, destName);
   if (!existsSync(src)) {
-    console.warn(`skip missing: ${srcRel}`);
+    console.error(`ERROR: missing source: ${srcRel}`);
+    missing++;
     continue;
   }
   try {
@@ -44,4 +54,8 @@ for (const [srcRel, destName] of MAP) {
   }
 }
 
+if (missing > 0) {
+  console.error(`FAILED — ${missing} source model(s) missing from assets-src/. Nothing was silently skipped.`);
+  process.exit(1);
+}
 console.log('done — models in public/models/');

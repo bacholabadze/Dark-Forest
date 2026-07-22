@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { PALETTE, BOTS, MODELS } from './constants.js';
+import { PALETTE, BOTS, MODELS, HQ } from './constants.js';
+import { resolveCollisions } from './world.js';
 import { loadGLB, cloneScene, normalise, stylise, countTriangles, bindAnimations, setAnimState } from './assets.js';
 
 function placeholderBot(guilty) {
@@ -29,7 +30,13 @@ function placeholderBot(guilty) {
 export function createBots(scene) {
   return BOTS.map((def, i) => {
     const root = new THREE.Group();
-    root.position.set(def.pos[0], 0, def.pos[2]);
+    // Spawn on the Raydium patrol ring, 120° apart so they never converge.
+    const patrolAngle = i * (Math.PI * 2 / 3);
+    root.position.set(
+      HQ.X + Math.cos(patrolAngle) * HQ.PATROL_RADIUS,
+      0,
+      HQ.Z + Math.sin(patrolAngle) * HQ.PATROL_RADIUS
+    );
 
     const ph = placeholderBot(def.guilty);
     root.add(ph);
@@ -74,7 +81,9 @@ export function createBots(scene) {
       fleeing: false,
       caged: false,
       phase: i * 1.7,
-      home: new THREE.Vector3(def.pos[0], 0, def.pos[2]),
+      patrolAngle,
+      offset: new THREE.Vector3(),   // avoidance-bubble displacement
+      heading: Math.atan2(-Math.sin(patrolAngle), Math.cos(patrolAngle)),
     };
   });
 }
@@ -105,7 +114,7 @@ export async function loadBotModels(bots, onInfo) {
 
       const prefer = b.def.guilty ? 'idle' : 'walk';
       b.anim = bindAnimations(obj, gltf.animations, prefer);
-      if (b.anim) b.anim.action.timeScale = b.def.guilty ? 0.001 : 0.6;
+      if (b.anim) setAnimState(b.anim, 'idle');
       ok++;
     } catch (e) {
       console.warn(`[bots] ${b.def.id} load failed`, e);
@@ -114,31 +123,89 @@ export async function loadBotModels(bots, onInfo) {
   return ok > 0;
 }
 
+// Barely-perceptible sway for parked (idle) rigs.
+function breathe(model, t) {
+  model.position.y = (model.userData.baseY || 0) + Math.sin(t * 1.6) * 0.02;
+  model.rotation.z = Math.sin(t * 0.9) * 0.006;
+}
+
+const _pos = new THREE.Vector3();
+const _away = new THREE.Vector3();
+
 export function updateBots(bots, dt, t, playerPos) {
   for (const b of bots) {
     if (b.anim?.mixer) b.anim.mixer.update(dt);
 
     if (b.caged) {
       if (b.anim) setAnimState(b.anim, 'idle');
+      if (b.model) breathe(b.model, t + b.phase);
       b.root.rotation.y += dt * 0.35;
       continue;
     }
 
     if (b.fleeing) {
       if (b.anim) setAnimState(b.anim, 'run');
+      if (b.model) {
+        b.model.position.y = b.model.userData.baseY || 0;
+        b.model.rotation.z = 0;
+      }
       const away = new THREE.Vector3().subVectors(b.root.position, playerPos).setY(0);
       if (away.lengthSq() < 0.001) away.set(1, 0, 0);
       away.normalize();
       const next = b.root.position.clone().addScaledVector(away, 9.2 * dt);
-      if (next.length() > 46) {
+      // 70, not 46: the patrol ring around the HQ reaches ~49 from origin,
+      // and the old bound snapped fleeing bots sideways the instant they ran.
+      if (next.length() > 70) {
         const tangent = new THREE.Vector3(-next.z, 0, next.x).normalize();
         next.copy(b.root.position).addScaledVector(tangent, 9.2 * dt);
       }
       b.root.position.x = next.x;
       b.root.position.z = next.z;
       b.root.lookAt(playerPos.x, b.root.position.y, playerPos.z);
-    } else if (b.anim) {
-      setAnimState(b.anim, 'idle');
+    } else {
+      // Patrol the Raydium perimeter ring.
+      b.patrolAngle += (HQ.PATROL_SPEED / HQ.PATROL_RADIUS) * dt;
+      const rx = HQ.X + Math.cos(b.patrolAngle) * HQ.PATROL_RADIUS;
+      const rz = HQ.Z + Math.sin(b.patrolAngle) * HQ.PATROL_RADIUS;
+
+      // Avoidance bubble: push along (bot − player) by penetration depth,
+      // decay back toward the ring — a slide-aside, not a retreat. 2.2 stays
+      // well inside the 4.6 scan range so bots never become unscannable.
+      _pos.set(rx + b.offset.x, 0, rz + b.offset.z);
+      _away.subVectors(_pos, playerPos).setY(0);
+      const pd = _away.length();
+      if (pd < HQ.BUBBLE && pd > 0.001) {
+        b.offset.addScaledVector(_away.normalize(), HQ.BUBBLE - pd);
+      }
+      b.offset.multiplyScalar(1 - Math.min(1, 2 * dt));
+
+      _pos.set(rx + b.offset.x, 0, rz + b.offset.z);
+      resolveCollisions(_pos);
+
+      const moved = Math.hypot(_pos.x - b.root.position.x, _pos.z - b.root.position.z) > 0.4 * dt;
+      b.root.position.x = _pos.x;
+      b.root.position.z = _pos.z;
+
+      // Face the ring tangent with the shortest-angle lerp — smooth turns.
+      const target = Math.atan2(-Math.sin(b.patrolAngle), Math.cos(b.patrolAngle));
+      let dh = target - b.heading;
+      while (dh > Math.PI) dh -= Math.PI * 2;
+      while (dh < -Math.PI) dh += Math.PI * 2;
+      b.heading += dh * Math.min(1, 10 * dt);
+      b.root.rotation.y = b.heading;
+
+      if (moved) {
+        if (b.anim) setAnimState(b.anim, 'walk');
+        // breathe() is only for parked rigs — it fights the walk cycle.
+        if (b.model) {
+          b.model.position.y = b.model.userData.baseY || 0;
+          b.model.rotation.z = 0;
+        }
+      } else {
+        if (b.anim) setAnimState(b.anim, 'idle');
+        // Phase offset so the three suspects don't breathe in lockstep.
+        if (b.model) breathe(b.model, t + b.phase);
+      }
     }
 
     b.beacon.visible = !b.scanned;

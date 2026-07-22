@@ -39,6 +39,9 @@ export async function reveal(rig, target, duration = 7.5) {
     cam.fov = 50 - 8 * e;
     cam.updateProjectionMatrix();
   });
+  // Same handoff as descent/punchIn — without this, the one frame between
+  // reveal and descent rebuilds from the stale yaw and cuts ~90°.
+  seedYaw(rig);
   rig.manual = false;
 }
 
@@ -83,7 +86,18 @@ export async function descent(rig, onStage, durationA = 6.0, durationB = 6.0) {
     cam.updateProjectionMatrix();
   });
 
+  seedYaw(rig);
   rig.manual = false;
+}
+
+/**
+ * Seed rig.yaw from where the cinematic actually left the camera, so the
+ * first gameplay frame resumes from that framing instead of teleporting
+ * back to the stale pre-cinematic yaw (a ~158° cut after the descent).
+ */
+function seedYaw(rig) {
+  const off = rig.camera.position.clone().sub(rig.target);
+  rig.yaw = Math.atan2(off.x, off.z);
 }
 
 /** Scene 7 — pull up and away so the moon can rise over the city. */
@@ -115,5 +129,6 @@ export async function punchIn(rig, target, duration = 1.5) {
     cam.position.lerpVectors(from, to, ease(k));
     cam.lookAt(fromLook);
   });
+  seedYaw(rig);
   rig.manual = false;
 }

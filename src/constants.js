@@ -1,6 +1,7 @@
 // Electric Forest palette — brighter sci-fi, readable on projector
 export const PALETTE = {
   void:     0x0B1026,
+  horizon:  0x1B1440,
   sky:      0x1A0A3E,
   panel:    0x152040,
   deepBlue: 0x30348B,
@@ -32,11 +33,28 @@ export const CAM = {
   MAX: 16,
   HEIGHT: 2.6,
   LERP: 9,
+  FOLLOW: 2.5,            // rad/s, constant angular velocity behind the player
+  FOLLOW_DEADZONE: 0.06,  // rad — stops micro-jitter at rest
+  FOLLOW_RESUME: 0.9,     // s to suspend follow after a manual drag
 };
 
 export const WORLD = {
   SIZE: 150,
   BLOCKS: 26,
+};
+
+// Raydium HQ — site derived by replaying the seeded generator: clears every
+// block footprint, the comms tower, and never overlaps the moon from spawn,
+// the descent hand-off, or the ascent start.
+export const HQ = {
+  X: 38,
+  Z: 5.5,
+  W: 14,
+  D: 14,
+  H: 70,
+  PATROL_RADIUS: 11,   // bot ring around the tower
+  PATROL_SPEED: 2.2,   // u/s along the ring
+  BUBBLE: 2.2,         // player-avoidance radius — must stay < scan range 4.6
 };
 
 export const MODELS = {
@@ -95,10 +113,13 @@ export const BOTS = [
   },
 ];
 
+// Amounts derive from the drawn case. The 8× front-run and 1.34× back-run
+// ratios reproduce the original MOON numbers (8,000 / 1,340 vs 1,000) exactly.
+const amt = (n) => `${Math.round(n).toLocaleString('en-US')} ${CASE.victimToken}`;
 export const TXS = [
-  { id: 'back',  kind: 'SELL', amount: '1,340 MOON', who: 'bot 0x2222…', slot: CASE.slot, correct: 2 },
-  { id: 'vict',  kind: 'BUY',  amount: '1,000 MOON', who: 'YOU',         slot: CASE.slot, correct: 1 },
-  { id: 'front', kind: 'BUY',  amount: '8,000 MOON', who: 'bot 0x2222…', slot: CASE.slot, correct: 0 },
+  { id: 'back',  kind: 'SELL', amount: amt(CASE.expected * 1.34), who: 'bot 0x2222…', slot: CASE.slot, correct: 2 },
+  { id: 'vict',  kind: 'BUY',  amount: amt(CASE.expected),        who: 'YOU',         slot: CASE.slot, correct: 1 },
+  { id: 'front', kind: 'BUY',  amount: amt(CASE.expected * 8),    who: 'bot 0x2222…', slot: CASE.slot, correct: 0 },
 ];
 
 export const STATE = {

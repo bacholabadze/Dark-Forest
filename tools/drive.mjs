@@ -11,8 +11,10 @@ page.on('console', (m) => {
   if (m.type() === 'error') console.error('CONSOLE', m.text());
 });
 
-await page.goto(URL, { waitUntil: 'networkidle', timeout: 60000 });
-await page.waitForSelector('#begin:not(.hidden)', { timeout: 30000 });
+// Generous boot budget: headless shell renders on software GL and can take
+// 10× longer than a real browser to compile shaders + decode Draco.
+await page.goto(URL, { waitUntil: 'networkidle', timeout: 90000 });
+await page.waitForSelector('#begin:not(.hidden)', { timeout: 90000 });
 await page.evaluate(() => document.getElementById('begin').click());
 
 // Scene 1 — sandwich
@@ -44,8 +46,10 @@ console.log('CHASE');
 
 await page.evaluate(() => {
   window.__test.gotoGuilty();
-  window.__test.press('Space');
+  window.__test.fire();
 });
+// Bolt travel time before the record can appear.
+await page.waitForTimeout(250);
 
 await page.waitForSelector('#record:not(.hidden)', { timeout: 15000 });
 await page.waitForFunction(() => {

@@ -1,9 +1,7 @@
 import * as THREE from 'three';
 import { MOVE, PALETTE, MODELS } from './constants.js';
-import { colliders } from './world.js';
+import { resolveCollisions } from './world.js';
 import { loadGLB, cloneScene, normalise, stylise, bindAnimations, setAnimState } from './assets.js';
-
-const RADIUS = 0.85;
 
 export function createPlayer(scene) {
   const root = new THREE.Group();
@@ -72,6 +70,7 @@ export function createPlayer(scene) {
     sprinting: false,
     frozen: false,
     moving: false,
+    idleT: 0,
   };
 
   root.position.copy(state.pos);
@@ -84,7 +83,7 @@ export function setPlayerModel(p, obj, animations) {
   p.model = obj;
   p.root.add(obj);
   p.anim = bindAnimations(obj, animations, 'walk');
-  if (p.anim) p.anim.action.timeScale = 0.001;
+  if (p.anim) setAnimState(p.anim, 'idle');
 }
 
 export async function loadPlayerModel(player, onInfo) {
@@ -114,17 +113,10 @@ export async function loadPlayerModel(player, onInfo) {
   }
 }
 
-function resolveCollisions(pos) {
-  for (const c of colliders) {
-    if (pos.y > c.maxY) continue;
-    const dx = pos.x - c.x, dz = pos.z - c.z;
-    const px = c.hw + RADIUS - Math.abs(dx);
-    const pz = c.hd + RADIUS - Math.abs(dz);
-    if (px > 0 && pz > 0) {
-      if (px < pz) pos.x += Math.sign(dx || 1) * px;
-      else pos.z += Math.sign(dz || 1) * pz;
-    }
-  }
+// Barely-perceptible sway so a parked pose isn't a mannequin.
+function breathe(model, t) {
+  model.position.y = (model.userData.baseY || 0) + Math.sin(t * 1.6) * 0.02;
+  model.rotation.z = Math.sin(t * 0.9) * 0.006;
 }
 
 export function updatePlayer(p, dt, input, camYaw) {
@@ -134,6 +126,7 @@ export function updatePlayer(p, dt, input, camYaw) {
       p.anim.mixer.update(dt);
       setAnimState(p.anim, 'idle');
     }
+    if (p.model) { p.idleT += dt; breathe(p.model, p.idleT); }
     p.moving = false;
     return false;
   }
@@ -186,7 +179,17 @@ export function updatePlayer(p, dt, input, camYaw) {
     p.anim.mixer.update(dt);
     if (moving) setAnimState(p.anim, p.sprinting ? 'run' : 'walk');
     else setAnimState(p.anim, 'idle');
-    if (p.anim.action.timeScale < 0.01) p.anim.action.timeScale = moving ? (p.sprinting ? 1.3 : 1) : 0.85;
+  }
+
+  if (p.model) {
+    if (moving) {
+      p.idleT = 0;
+      p.model.position.y = p.model.userData.baseY || 0;
+      p.model.rotation.z = 0;
+    } else {
+      p.idleT += dt;
+      breathe(p.model, p.idleT);
+    }
   }
 
   p.moving = moving;
